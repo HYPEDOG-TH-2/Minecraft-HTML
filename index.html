@@ -12,7 +12,21 @@
   <div id="hud">
     <div>FPS: <span id="fps">60</span> | Mode: <span id="modeLabel">SURVIVAL</span> [M]</div>
     <div>XYZ: <span id="coords">0, 0, 0</span> | Render: <span id="renderLabel">4</span> [R]</div>
-    <div id="multiplayerHud" hidden>Online · <span id="multiplayerCount">1</span> players · room <span id="multiplayerHudCode"></span></div>
+    <div id="multiplayerHud" hidden>Online · <span id="multiplayerCount">1</span> players · room <span id="multiplayerHudCode"></span>
+      <button id="chatToggleButton" type="button">CHAT</button>
+      <button id="playersToggleButton" type="button" hidden>PLAYERS</button>
+      <button id="cloudSaveButton" type="button" hidden>DOWNLOAD BACKUP JSON</button>
+    </div>
+    <section id="multiplayerChat" class="multiplayer-float-panel" hidden aria-label="Multiplayer chat">
+      <div class="multiplayer-panel-heading"><strong>WORLD CHAT</strong><button type="button" id="closeChatButton" aria-label="Close chat">×</button></div>
+      <div id="chatMessages" aria-live="polite"></div>
+      <form id="chatForm"><input id="chatInput" maxlength="240" autocomplete="off" placeholder="Message the players…"><button type="submit">SEND</button></form>
+    </section>
+    <section id="hostPlayersPanel" class="multiplayer-float-panel host-player-panel" hidden aria-label="Online players">
+      <div class="multiplayer-panel-heading"><strong>PLAYERS / MODERATION</strong><button type="button" id="closePlayersButton" aria-label="Close players">×</button></div>
+      <div id="hostPlayersList"></div>
+      <button type="button" class="panel-refresh-button" id="refreshPlayersButton">REFRESH PLAYERS</button>
+    </section>
     <div>Biome: <span id="biomeLabel">Plains</span> | Temp: <span id="temperatureLabel">15°C</span> | Seed: <span id="seedLabel"></span></div>
     <div>Mine/Attack: Left Click / [Q] | Place/Use: Right Click / [F] | Inventory: [E]</div>
     <div>Drop: [G] / [Shift+G] stack | Creative pick: Middle Click</div>
@@ -21,8 +35,9 @@
   <div id="hotbar"></div>
   <div id="toast"></div>
   <div id="inventoryPanel" aria-label="Inventory and crafting">
-    <div class="inventory-header"><div><h2>Inventory &amp; Crafting</h2><p id="stationLabel">Craft simple recipes anywhere. Place a crafting table to make tools.</p></div><button class="inventory-close" id="closeInventory" aria-label="Close inventory">×</button></div>
-    <div class="world-actions"><button id="saveWorldButton" type="button">Save world JSON</button><button id="loadWorldButton" type="button">Load world JSON</button><input id="loadWorldInput" type="file" accept=".json,application/json" hidden></div>
+    <div class="inventory-header"><div><h2>Inventory &amp; Crafting</h2><p id="stationLabel">Hand craft simple items anywhere. Right-click crafting tables, furnaces, campfires and chests to use them.</p></div><button class="inventory-close" id="closeInventory" aria-label="Close inventory">×</button></div>
+    <div class="world-actions"><button id="saveWorldButton" type="button">Save world JSON</button><button id="loadWorldButton" type="button">Import JSON backup</button><input id="loadWorldInput" type="file" accept=".json,application/json" hidden></div>
+    <p class="inventory-help">In multiplayer, the host downloads one complete JSON backup containing the shared world, all player inventories, equipment, stats and saved positions. Import that file to restore the world and its player saves.</p>
     <div class="inventory-layout">
       <section>
         <h3>Backpack</h3><p id="inventoryCapacity" class="inventory-capacity"></p>
@@ -64,6 +79,7 @@
       <label class="multiplayer-field" for="multiplayerMode"><span>World mode (host chooses)</span><select id="multiplayerMode"><option value="classic">Classic</option><option value="realistic">Realistic</option><option value="creative">Creative</option></select></label>
       <label class="multiplayer-field" for="roomVisibility"><span>Room visibility</span><select id="roomVisibility"><option value="private">Private · invite code only</option><option value="public">Public · listed in room finder</option></select></label>
       <button class="btn multiplayer-wide" id="createRoomButton" type="button">CREATE ROOM</button>
+      <button class="btn secondary multiplayer-wide" id="resumeWorldButton" type="button">IMPORT JSON BACKUP</button>
       <button class="btn secondary multiplayer-wide" id="findRoomsButton" type="button">FIND PUBLIC ROOMS</button>
       <div class="room-divider"><span>or join a friend</span></div>
       <label class="multiplayer-field" for="roomCodeInput"><span>Invite code</span><input id="roomCodeInput" type="text" maxlength="36" placeholder="Paste the 32-character code" autocomplete="off" spellcheck="false"></label>
@@ -105,7 +121,7 @@
     <section class="menu-card quit-card" id="quitPrompt" role="dialog" aria-modal="true" aria-labelledby="quitTitle" hidden>
       <div class="menu-kicker">Leave this world?</div>
       <h2 id="quitTitle">QUIT WORLD</h2>
-      <p class="quit-copy">Save a JSON copy before leaving, or return to the title menu without saving this session.</p>
+      <p class="quit-copy">When the host saves and quits, a complete JSON backup downloads with the shared world and every player’s inventory, equipment, stats and position. Import that backup later to restore the whole session.</p>
       <div class="quit-actions">
         <button class="btn" id="saveQuitButton">SAVE &amp; QUIT</button>
         <button class="btn secondary" id="discardQuitButton">QUIT WITHOUT SAVING</button>

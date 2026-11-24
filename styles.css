@@ -193,3 +193,27 @@
       .slot .hotbar-icon { width:21px; height:21px; }
       .slot .item-label { max-width:calc(10vw - 10px); font-size:7px; }
     }
+
+/* Multiplayer overlays */
+#multiplayerHud { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+#multiplayerHud button { padding:4px 7px; min-width:0; color:#fff; background:#35443a; border:1px solid #8c9b7c; font:10px 'Courier New',monospace; cursor:pointer; }
+.multiplayer-float-panel { position:fixed; z-index:18; top:90px; right:14px; width:min(340px,calc(100vw - 28px)); max-height:min(60vh,480px); display:flex; flex-direction:column; gap:9px; padding:12px; color:#f4ead7; background:rgba(25,29,27,.97); border:2px solid #77735b; box-shadow:0 8px 28px #000b; }
+.multiplayer-float-panel[hidden] { display:none; }
+.multiplayer-panel-heading { display:flex; justify-content:space-between; align-items:center; color:#fff1b8; font-size:12px; letter-spacing:1px; }
+.multiplayer-panel-heading button { border:0; background:transparent; color:white; font-size:22px; cursor:pointer; }
+#chatMessages { min-height:80px; max-height:34vh; overflow:auto; display:flex; flex-direction:column; gap:5px; font-size:11px; line-height:1.4; }
+.chat-line { overflow-wrap:anywhere; color:#e4e6dc; }
+.chat-line strong { color:#d3c68e; margin-right:5px; }
+#chatForm { display:flex; gap:6px; }
+#chatInput { min-width:0; flex:1; padding:8px; color:#fff; background:#30342e; border:1px solid #77735b; font:12px 'Courier New',monospace; }
+#chatForm button,.panel-refresh-button { padding:7px 9px; color:#fff; background:#495642; border:1px solid #8c9b7c; font:10px 'Courier New',monospace; cursor:pointer; }
+#hostPlayersList { min-height:30px; overflow:auto; display:grid; gap:6px; }
+.host-player-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; padding:7px; background:#30342e; border:1px solid #77735b; font-size:11px; }
+.host-player-row small { display:block; color:#bfc8b8; margin-top:3px; }
+.host-player-actions { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
+.host-player-actions button { min-width:0; padding:5px 6px; color:#fff; background:#66543c; border:1px solid #9a815c; font:9px 'Courier New',monospace; cursor:pointer; }
+.host-player-actions button.danger { background:#713d36; }
+
+#multiplayerHud[hidden] { display:none; }
+/* These controls sit inside the non-interactive HUD but must remain clickable. */
+#multiplayerHud button,.multiplayer-float-panel { pointer-events:auto; }

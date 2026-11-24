@@ -328,6 +328,18 @@
         ctx.fillStyle='#704525'; ctx.fillRect(1,1,14,14); ctx.fillStyle='#FFCF68'; ctx.fillRect(3,3,10,10);
         ctx.fillStyle='#FFF2B0'; ctx.fillRect(5,5,6,6); ctx.fillStyle='#FFFFFF'; ctx.fillRect(7,7,2,2);
       }),
+      door: makeTex('#8A552C',['#704323','#A66B38'],ctx=>{
+        // Pixel-art oak door: outer frame, inset panels, cross rails and brass handle.
+        ctx.fillStyle='#4F301C'; ctx.fillRect(0,0,16,16);
+        ctx.fillStyle='#A87340'; ctx.fillRect(2,0,12,16);
+        ctx.fillStyle='#704323'; ctx.fillRect(3,1,1,14); ctx.fillRect(12,1,1,14);
+        ctx.fillStyle='#B98249'; ctx.fillRect(4,1,8,14);
+        ctx.fillStyle='#59371F'; ctx.fillRect(4,2,8,4); ctx.fillRect(4,9,8,4);
+        ctx.fillStyle='#8A552C'; ctx.fillRect(5,3,6,2); ctx.fillRect(5,10,6,2);
+        ctx.fillStyle='#C28A4A'; ctx.fillRect(5,3,5,1); ctx.fillRect(5,10,5,1);
+        ctx.fillStyle='#4D2E1A'; ctx.fillRect(2,7,12,1);
+        ctx.fillStyle='#E4B94F'; ctx.fillRect(11,7,2,2); ctx.fillStyle='#FFF0A0'; ctx.fillRect(11,7,1,1);
+      }),
       redstoneOre: makeTex('#55515A',['#403C45','#716B72'],ctx=>{
         ctx.fillStyle='#7A1A25'; [[2,3],[10,2],[5,8],[12,10],[2,13],[9,14]].forEach(([x,y])=>ctx.fillRect(x,y,3,2));
         ctx.fillStyle='#D52B35'; ctx.fillRect(3,3,1,1); ctx.fillRect(11,2,1,1); ctx.fillRect(6,8,1,1); ctx.fillRect(13,10,1,1);
@@ -402,13 +414,16 @@
       { id: 40, name:'Lit Redstone Lamp', color:'#FFE58A', solid:true, transparent:false, dropItem:39, mat:new THREE.MeshLambertMaterial({map:TEX.lampLit,emissive:0xD36A18,emissiveIntensity:0.9}) },
       { id: 41, name:'Lever On', color:'#FFE47D', solid:false, transparent:true, dropItem:38, mat:new THREE.MeshLambertMaterial({map:TEX.leverOn,transparent:true,emissive:0x815016}) },
       { id: 42, name:'Powered Redstone Dust', color:'#FF3D37', solid:false, transparent:true, dropItem:37, mat:new THREE.MeshLambertMaterial({map:TEX.redstoneDustLit,transparent:true,emissive:0xA80A15}) },
-      { id: 43, name:'Redstone Ore', color:'#A52A32', solid:true, transparent:false, dropItem:37, requiredPickaxe:3, mat:new THREE.MeshLambertMaterial({map:TEX.redstoneOre}) }
+      { id: 43, name:'Redstone Ore', color:'#A52A32', solid:true, transparent:false, dropItem:37, requiredPickaxe:3, mat:new THREE.MeshLambertMaterial({map:TEX.redstoneOre}) },
+      { id: 44, name:'Wooden Door', color:'#96602F', solid:true, transparent:true, preferredTool:'axe', geometry:new THREE.BoxGeometry(1,1,0.12), mat:new THREE.MeshLambertMaterial({map:TEX.door}) },
+      { id: 45, name:'Oak Stairs', color:'#A88754', solid:true, transparent:false, preferredTool:'axe', geometry:(()=>{const shape=new THREE.Shape();shape.moveTo(-0.5,-0.5);shape.lineTo(0.5,-0.5);shape.lineTo(0.5,0.5);shape.lineTo(0,0.5);shape.lineTo(0,0);shape.lineTo(-0.5,0);shape.closePath();const g=new THREE.ExtrudeGeometry(shape,{depth:1,bevelEnabled:false});g.translate(0,0,-0.5);g.rotateY(-Math.PI/2);return g;})(), mat:new THREE.MeshLambertMaterial({map:TEX.planks}) },
+      { id: 46, name:'Wooden Door Top', color:'#96602F', solid:true, transparent:true, preferredTool:'axe', geometry:new THREE.BoxGeometry(1,1,0.12), mat:new THREE.MeshLambertMaterial({map:TEX.door}) }
     ];
 
     const BLOCK_BY_ID = {};
     const ITEM_INFO = {};
     BLOCKS.forEach(b => { BLOCK_BY_ID[b.id] = b; ITEM_INFO[b.id] = { id:b.id, name:b.name, color:b.color, blockId:b.id }; });
-    delete ITEM_INFO[40]; delete ITEM_INFO[41]; delete ITEM_INFO[42];
+    delete ITEM_INFO[40]; delete ITEM_INFO[41]; delete ITEM_INFO[42]; delete ITEM_INFO[46];
     [
       { id:100, name:'Coal', color:'#272727' }, { id:101, name:'Raw Iron', color:'#B87352' },
       { id:102, name:'Raw Gold', color:'#F2C744' }, { id:103, name:'Diamond', color:'#4EE2EC' },
@@ -699,7 +714,7 @@
 
     BLOCKS.forEach(b => {
       if (b.id===1||b.id===6||b.id===10) return;
-      const im = new THREE.InstancedMesh(unitBox, b.mat, INSTANCE_CAPACITY[b.id] || MAX_INSTANCES);
+      const im = new THREE.InstancedMesh(b.geometry||unitBox, b.mat, INSTANCE_CAPACITY[b.id] || MAX_INSTANCES);
       im.count = 0;
       im.frustumCulled = false;
       scene.add(im);
@@ -739,6 +754,9 @@
     const CHUNK_SIZE = 12;
     let renderDist = 4;
     const voxelMap = new Map();
+    // Per-block placement direction and door state are saved and synchronized separately.
+    const blockRotations = new Map();
+    const openDoors = new Set();
     const voxelKeysByChunk = new Map();
     const REDSTONE_NODE_IDS=new Set([37,38,39,40,41,42]);
     const REDSTONE_NEIGHBORS=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
@@ -762,6 +780,9 @@
     let roomDirectoryChannel=null, roomDirectoryPromise=null;
     let multiplayerChannel=null, multiplayerRoomId='', multiplayerRoomCode='', multiplayerClientId='';
     let multiplayerPlayerName='Player', multiplayerIsHost=false, multiplayerRoomMode='classic', multiplayerRoomSeed=0, multiplayerRoomVisibility='private';
+    let multiplayerPlayerId='', multiplayerPlayerToken='', multiplayerHostToken='';
+    let multiplayerPendingPlayerData=null, multiplayerLoadedSavedWorld=false, multiplayerLastWorldSave=0;
+    let multiplayerImportedBackup=false, multiplayerBackupWaiter=null;
     let multiplayerPositionTimer=0;
 
     // Compact numeric keys avoid building and splitting strings for every voxel.
@@ -835,7 +856,7 @@
     function recordMultiplayerBlockChange(packedKey,id) {
       if (!multiplayerChannel) return;
       cacheMultiplayerOverride(packedKey,id);
-      sendMultiplayerEvent('block-change',{key:packedKey,id});
+      sendMultiplayerEvent('block-change',{key:packedKey,id,rotation:blockRotations.get(packedKey)||0,open:openDoors.has(packedKey)});
     }
     function applyMultiplayerOverridesForChunk(cx,cz) {
       const overrides=multiplayerOverridesByChunk.get(chunkIndexKey(cx,cz));
@@ -852,8 +873,8 @@
     function applyRemoteBlockChange(payload) {
       if (!payload||!isValidMultiplayerKey(payload.key)||(payload.id!==null&&!BLOCK_BY_ID[payload.id])) return;
       const pos=decodeVoxelPosition(payload.key), oldId=voxelMap.get(payload.key);
-      if (payload.id===null) deleteVoxel(pos.x,pos.y,pos.z);
-      else setVoxelAtKey(payload.key,pos.x,pos.z,payload.id);
+      if (payload.id===null) { deleteVoxel(pos.x,pos.y,pos.z); blockRotations.delete(payload.key); openDoors.delete(payload.key); }
+      else { setVoxelAtKey(payload.key,pos.x,pos.z,payload.id); blockRotations.set(payload.key,Number.isFinite(payload.rotation)?payload.rotation:0); if (payload.open) openDoors.add(payload.key); else openDoors.delete(payload.key); }
       cacheMultiplayerOverride(payload.key,payload.id);
       if (oldId===6) queueLeafDecayAround(pos.x,pos.y,pos.z);
       if (REDSTONE_NODE_IDS.has(oldId)||REDSTONE_NODE_IDS.has(payload.id)) recomputeRedstonePower();
@@ -861,14 +882,18 @@
     }
     function resetWorldForMultiplayer(seed,overrides=[]) {
       worldSeed=seed>>>0; legacyWorldGeneration=false; seedLabel.textContent=worldSeed;
-      voxelMap.clear(); voxelKeysByChunk.clear(); redstoneComponentKeys.clear(); leafDecayTimers.clear();
+      voxelMap.clear(); blockRotations.clear(); openDoors.clear(); voxelKeysByChunk.clear(); redstoneComponentKeys.clear(); leafDecayTimers.clear();
       generatedChunks.clear(); chunkQueue.length=0; queuedChunks.clear(); activeChunkJob=null;
       multiplayerOverrides.clear(); multiplayerOverridesByChunk.clear();
       overrides.forEach(entry=>{
         if (!Array.isArray(entry)||!isValidMultiplayerKey(entry[0])||(entry[1]!==null&&!BLOCK_BY_ID[entry[1]])) return;
+        if(entry[1]!==null){if(Number.isFinite(entry[2]))blockRotations.set(entry[0],entry[2]);if(entry[3])openDoors.add(entry[0]);}
         cacheMultiplayerOverride(entry[0],entry[1]);
       });
       chestContents.clear(); clearDroppedItems(); clearMobs();
+      Object.keys(inventoryCounts).forEach(id=>delete inventoryCounts[id]);
+      Object.keys(equippedItems).forEach(slot=>equippedItems[slot]=null);
+      hotbarSlots.fill(null); savedSurvivalHotbar=hotbarSlots.slice(); selectedSlot=0;
       player.pos.set(0.5,terrainHeight(0,0)+3.2,0.5); player.vel.set(0,0,0); player.yaw=0; player.pitch=-0.25;
       player.fallStartY=player.pos.y;
       generateChunk(0,0); processChunkGeneration(CHUNK_SIZE*CHUNK_SIZE,Infinity);
@@ -1270,6 +1295,19 @@
           dummy.position.y=y-0.2; dummy.scale.set(0.24,0.58,0.24);
           dummy.rotation.z=id===38?-0.3:0.3;
         }
+        const packedRotation=blockRotations.get(k)||0;
+        if (id===44||id===46) {
+          const doorBottomKey=id===46?keyOf(x,y-1,z):k;
+          const doorOpen=openDoors.has(doorBottomKey);
+          const swing=doorOpen?Math.PI/2:0;
+          // Rotate around the left-hand hinge rather than the block centre, so the
+          // open panel sits flat along the neighbouring side of the doorway.
+          if (doorOpen) {
+            dummy.position.x+=-0.5*Math.cos(packedRotation)+0.5*Math.cos(packedRotation+swing);
+            dummy.position.z+=0.5*Math.sin(packedRotation)-0.5*Math.sin(packedRotation+swing);
+          }
+          dummy.rotation.y=packedRotation+swing;
+        } else if (id===45||id===17||id===18||id===33) dummy.rotation.y=packedRotation;
         dummy.updateMatrix();
         if (id===1) {
           const palette=climateForColumn(x,z), idx=grassInstanceCounts[palette];
@@ -1371,6 +1409,7 @@
     let mobSpawnTimer=0;
     let chestOpenKey=null;
     let craftingTableOpen=false;
+    let craftingStationId=null;
 
     const hotbarEl = document.getElementById('hotbar');
     const heartsEl = document.getElementById('hearts');
@@ -1439,14 +1478,16 @@
       { name:'Basalt', inputs:{13:4}, outputs:{32:4}, description:'4 Deepslate → 4 Basalt', needsTable:true },
       { name:'Chest', inputs:{5:8}, outputs:{33:1}, description:'8 Planks → 1 Chest', needsTable:true },
       { name:'Lever', inputs:{4:1,5:1,104:1}, outputs:{38:1}, description:'1 Cobblestone + 1 Plank + 1 Stick', needsTable:true },
-      { name:'Redstone Lamp', inputs:{37:4,9:1}, outputs:{39:1}, description:'4 Redstone Dust + 1 Glass', needsTable:true }
+      { name:'Redstone Lamp', inputs:{37:4,9:1}, outputs:{39:1}, description:'4 Redstone Dust + 1 Glass', needsTable:true },
+      { name:'Wooden Door', inputs:{5:6}, outputs:{44:1}, description:'6 Planks → 1 Door', needsTable:true },
+      { name:'Oak Stairs', inputs:{5:6}, outputs:{45:4}, description:'6 Planks → 4 Stairs', needsTable:true }
     ];
 
     function worldSaveData() {
       return {
-        format:'minecraft-html-world', version:7, seed:worldSeed,
+        format:'minecraft-html-world', version:8, seed:worldSeed,
         generation:legacyWorldGeneration?'legacy-v1':'seeded-v8-redstone-islands', savedAt:new Date().toISOString(),
-        blocks:Array.from(voxelMap.entries()), generatedChunks:Array.from(generatedChunks),
+        blocks:Array.from(voxelMap.entries()), blockRotations:Array.from(blockRotations.entries()), openDoors:Array.from(openDoors), generatedChunks:Array.from(generatedChunks),
         leafDecayTimers:Array.from(leafDecayTimers.entries()).filter(([key,time])=>voxelMap.get(key)===10&&Number.isFinite(time)),
         pendingChunks:[...(activeChunkJob?[activeChunkJob]:[]),...chunkQueue].map(job=>({cx:job.cx,cz:job.cz,nextColumn:job.nextColumn})),
         player:{x:player.pos.x,y:player.pos.y,z:player.pos.z,yaw:player.yaw,pitch:player.pitch,health,hunger,thirst,bodyTemperature,flying:player.flying},
@@ -1470,18 +1511,20 @@
       } catch (error) { showToast('Could not save world JSON'); return false; }
     }
     function loadWorldData(data) {
-      if (!data || data.format!=='minecraft-html-world' || ![1,2,3,4,5,6,7].includes(data.version) || !Array.isArray(data.blocks) || !Array.isArray(data.generatedChunks)) {
+      if (!data || data.format!=='minecraft-html-world' || ![1,2,3,4,5,6,7,8].includes(data.version) || !Array.isArray(data.blocks) || !Array.isArray(data.generatedChunks)) {
         throw new Error('Invalid world save');
       }
       legacyWorldGeneration=data.version===1 || data.generation==='legacy-v1';
       if (data.version>=2 && !Number.isInteger(data.seed)) throw new Error('World save has no generation seed');
       worldSeed=legacyWorldGeneration?0:(data.seed>>>0);
       seedLabel.textContent=worldSeed;
-      voxelMap.clear(); voxelKeysByChunk.clear(); redstoneComponentKeys.clear(); leafDecayTimers.clear(); generatedChunks.clear(); chunkQueue.length=0; queuedChunks.clear(); activeChunkJob=null;
+      voxelMap.clear(); blockRotations.clear(); openDoors.clear(); voxelKeysByChunk.clear(); redstoneComponentKeys.clear(); leafDecayTimers.clear(); generatedChunks.clear(); chunkQueue.length=0; queuedChunks.clear(); activeChunkJob=null;
       data.blocks.forEach(entry=>{
         if (!Array.isArray(entry) || !Number.isSafeInteger(entry[0]) || !BLOCK_BY_ID[entry[1]]) return;
         setPackedVoxel(entry[0],entry[1]);
       });
+      (Array.isArray(data.blockRotations)?data.blockRotations:[]).forEach(entry=>{if(Array.isArray(entry)&&Number.isSafeInteger(entry[0])&&Number.isFinite(entry[1])&&voxelMap.has(entry[0]))blockRotations.set(entry[0],entry[1]);});
+      (Array.isArray(data.openDoors)?data.openDoors:[]).forEach(key=>{if(Number.isSafeInteger(key)&&voxelMap.get(key)===44)openDoors.add(key);});
       (Array.isArray(data.leafDecayTimers)?data.leafDecayTimers:[]).forEach(entry=>{
         if (Array.isArray(entry)&&Number.isSafeInteger(entry[0])&&voxelMap.get(entry[0])===10&&Number.isFinite(entry[1])&&entry[1]>0) {
           leafDecayTimers.set(entry[0],Math.min(10,entry[1]));
@@ -1697,9 +1740,8 @@
       return false;
     }
     function craftRecipe(recipe) {
-      if (craftingTableOpen&&!recipe.needsTable) return showToast('That recipe is not made at the workbench');
-      if (recipe.needsTable&&!craftingTableOpen) return showToast('Open a workbench to craft that');
-      if (recipe.needsFurnace && !isFurnaceNearby()) return showToast('Place a furnace nearby first');
+      if (recipe.needsTable && (!craftingTableOpen||craftingStationId!==18)) return showToast('Open a crafting table to make that');
+      if (recipe.needsFurnace && ![17,36].includes(craftingStationId)) return showToast('Open a furnace or campfire to make that');
       if (!isCreative && !hasItems(recipe.inputs)) return showToast('Not enough materials');
       if (!canAddItems(recipe.outputs)) return showToast('Inventory full');
       if (!isCreative) Object.entries(recipe.inputs).forEach(([id,amount]) => {
@@ -1724,6 +1766,7 @@
       const moved=Math.min(available,ITEM_STACK_LIMIT-current);
       if (!moved) { showToast('That chest stack is full'); return; }
       contents[itemId]=current+moved; chestContents.set(chestOpenKey,contents);
+      sendMultiplayerEvent('chest-change',{key:chestOpenKey,contents:{...contents}});
       if (!isCreative) {
         inventoryCounts[itemId]-=moved;
         if (inventoryCounts[itemId]<=0) delete inventoryCounts[itemId];
@@ -1740,6 +1783,7 @@
         if (slot<0) slot=selectedSlot;
         hotbarSlots[slot]=itemId; selectedSlot=slot;
         delete contents[itemId]; chestContents.set(chestOpenKey,contents);
+        sendMultiplayerEvent('chest-change',{key:chestOpenKey,contents:{...contents}});
         renderHotbar(); renderInventory();
         return;
       }
@@ -1748,6 +1792,7 @@
       contents[itemId]-=moved;
       if (contents[itemId]<=0) delete contents[itemId];
       chestContents.set(chestOpenKey,contents);
+      sendMultiplayerEvent('chest-change',{key:chestOpenKey,contents:{...contents}});
       renderInventory();
     }
     function createItemCard(itemId,count,origin) {
@@ -1780,7 +1825,7 @@
       inventoryGrid.innerHTML='';
       const inChest=chestOpenKey!==null;
       recipeSection.hidden=inChest; chestSection.hidden=!inChest;
-      recipeSection.querySelector('h3').textContent=craftingTableOpen?'Workbench': 'Recipes';
+      recipeSection.querySelector('h3').textContent=craftingStationId===18?'Crafting Table':craftingStationId===17?'Furnace':craftingStationId===36?'Campfire':'Hand Crafting';
       trashDropZone.hidden=false;
       trashDropZone.textContent=isCreative?'Drag a hotbar item here to remove it':'Drag a hotbar stack here to drop it';
       inventoryCapacityEl.textContent=isCreative?'Creative inventory · unlimited items':`${Object.keys(inventoryCounts).length} / ${INVENTORY_SLOT_LIMIT} slots · stacks up to ${ITEM_STACK_LIMIT}`;
@@ -1793,15 +1838,15 @@
         return;
       }
       const tableNearby=craftingTableOpen||isCraftingTableNearby(), furnaceNearby=isFurnaceNearby();
-      stationLabel.textContent=craftingTableOpen ? 'Workbench · only recipes made here are shown.' : furnaceNearby ? 'Furnace nearby: smelt sand into glass, refine ores and cook meat. Use a workbench for tools and building recipes.' : 'Craft simple recipes anywhere. Use a workbench for tools and building recipes; smelting recipes need a furnace.';
+      stationLabel.textContent=craftingStationId===18?'Crafting table · hand-crafted recipes and table recipes are available here.':craftingStationId===17?'Furnace · smelting and cooking recipes are available here.':craftingStationId===36?'Campfire · cooking and heating recipes are available here.':'Hand crafting · simple recipes only. Use a crafting table or furnace for station recipes.';
       recipeList.innerHTML='';
-      const shownRecipes=RECIPES.filter(recipe=>craftingTableOpen?recipe.needsTable:!recipe.needsTable);
+      const shownRecipes=RECIPES.filter(recipe=>craftingStationId===18?!recipe.needsFurnace:([17,36].includes(craftingStationId)?!!recipe.needsFurnace:!recipe.needsTable&&!recipe.needsFurnace));
       shownRecipes.forEach(recipe=>{
         const button=document.createElement('button');
-        const ready=(isCreative||hasItems(recipe.inputs))&&(!recipe.needsTable||tableNearby)&&(!recipe.needsFurnace||furnaceNearby)&&canAddItems(recipe.outputs);
+        const ready=(isCreative||hasItems(recipe.inputs))&&(!recipe.needsTable||craftingStationId===18)&&(!recipe.needsFurnace||[17,36].includes(craftingStationId))&&canAddItems(recipe.outputs);
         button.type='button'; button.className='recipe'; button.disabled=!ready;
         const outputName=Object.keys(recipe.outputs).map(id=>`${ITEM_INFO[id].name} ×${recipe.outputs[id]}`).join(', ');
-        const stationNote=recipe.needsTable&&!tableNearby?' · needs nearby table':recipe.needsFurnace&&!furnaceNearby?' · needs nearby furnace':'';
+        const stationNote='';
         button.innerHTML=`<strong>${recipe.name} → ${outputName}</strong><small>${recipe.description}${stationNote}</small>`;
         button.addEventListener('click',()=>craftRecipe(recipe)); recipeList.appendChild(button);
       });
@@ -1815,10 +1860,10 @@
         renderInventory();
         if (document.pointerLockElement) document.exitPointerLock();
       } else if (gameStarted) {
-        craftingTableOpen=false;
+        craftingTableOpen=false; craftingStationId=null;
         requestGamePointerLock();
       } else {
-        craftingTableOpen=false;
+        craftingTableOpen=false; craftingStationId=null;
       }
     }
     function renderHotbar() {
@@ -2225,13 +2270,17 @@
     const multiplayerHud=document.getElementById('multiplayerHud');
     const multiplayerHudCode=document.getElementById('multiplayerHudCode');
     const multiplayerStatusEl=document.getElementById('multiplayerStatus');
+    const multiplayerChatPanel=document.getElementById('multiplayerChat');
+    const hostPlayersPanel=document.getElementById('hostPlayersPanel');
+    const chatMessagesEl=document.getElementById('chatMessages');
+    const hostPlayersListEl=document.getElementById('hostPlayersList');
     let multiplayerJoinTimeout=null;
 
     function showMainMenu() {
       if (!hasPlayedBefore&&multiplayerChannel) disconnectMultiplayerRoom();
       mainMenu.hidden=false; settingsMenu.hidden=true; modeMenu.hidden=true; multiplayerMenu.hidden=true; quitPrompt.hidden=true;
       quitButton.hidden=!hasPlayedBefore;
-      multiplayerButton.hidden=hasPlayedBefore;
+      multiplayerButton.hidden=hasPlayedBefore&&!getLastHostSession();
       document.getElementById('roomCodePause').hidden=!(hasPlayedBefore&&multiplayerRoomCode);
       document.getElementById('pauseRoomCode').textContent=multiplayerRoomCode;
       menuTitle.innerHTML=hasPlayedBefore?'PAUSED':'MINECRAFT <span>HTML</span>';
@@ -2267,12 +2316,22 @@
       document.body.focus();
       requestGamePointerLock();
     }
-    function quitToTitle(saveWorld) {
-      if (saveWorld&&!downloadWorldJson()) return;
+    async function quitToTitle(saveWorld) {
+      if (multiplayerChannel) {
+        if (saveWorld&&multiplayerIsHost) {
+          const backedUp=await downloadMultiplayerBackup();
+          if (!backedUp) return;
+          try { await callWorldApi('mark_host_offline',{world_id:multiplayerRoomId,host_token:multiplayerHostToken}); }
+          catch (error) { console.warn('Could not mark the host offline before leaving:',error); }
+        } else {
+          const saved=await savePlayerToCloud();
+          if (!saved&&saveWorld) return;
+        }
+      } else if (saveWorld&&!downloadWorldJson()) return;
       gameStarted=false;
       if (document.pointerLockElement) document.exitPointerLock();
       quitPrompt.hidden=true; overlay.style.display='none';
-      setTimeout(()=>window.location.reload(),saveWorld?1100:50);
+      setTimeout(()=>window.location.reload(),saveWorld?650:50);
     }
 
     function chooseGameMode(mode) {
@@ -2297,6 +2356,226 @@
       else for (let i=0;i<bytes.length;i++) bytes[i]=Math.floor(Math.random()*256);
       return Array.from(bytes,value=>value.toString(16).padStart(2,'0')).join('').toUpperCase();
     }
+    const MULTIPLAYER_API_URL=`${SUPABASE_URL}/functions/v1/mc-world-api`;
+    async function callWorldApi(action,payload={},options={}) {
+      if (!multiplayerClient) throw new Error('Supabase is not available. Check your connection and reload.');
+      const response=await fetch(MULTIPLAYER_API_URL,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','apikey':SUPABASE_PUBLISHABLE_KEY},
+        body:JSON.stringify({action,...payload}),
+        keepalive:!!options.keepalive
+      });
+      let result={};
+      try { result=await response.json(); } catch (_) {}
+      if (!response.ok||result.error) throw new Error(result.error||`World service returned ${response.status}`);
+      return result;
+    }
+    function playerSessionStorageKey(worldId) { return `mc-player-session:${worldId}`; }
+    function hostSessionStorageKey(worldId) { return `mc-host-session:${worldId}`; }
+    function getSavedPlayerSession(worldId) {
+      try { return JSON.parse(localStorage.getItem(playerSessionStorageKey(worldId))||'null'); } catch (_) { return null; }
+    }
+    function storePlayerSession(worldId,playerId,playerToken) {
+      try { localStorage.setItem(playerSessionStorageKey(worldId),JSON.stringify({playerId,playerToken})); } catch (_) {}
+    }
+    function storeHostSession(worldId,hostToken,playerId,playerToken) {
+      try {
+        localStorage.setItem(hostSessionStorageKey(worldId),JSON.stringify({hostToken,playerId,playerToken}));
+        localStorage.setItem('mc-last-host-world',worldId);
+      } catch (_) {}
+    }
+    function getLastHostSession() {
+      try {
+        const worldId=localStorage.getItem('mc-last-host-world');
+        const session=worldId?JSON.parse(localStorage.getItem(hostSessionStorageKey(worldId))||'null'):null;
+        return worldId&&session&&session.hostToken&&session.playerId&&session.playerToken?{worldId,...session}:null;
+      } catch (_) { return null; }
+    }
+    function sharedWorldSaveData() {
+      const data=worldSaveData();
+      data.player={};
+      delete data.inventory; delete data.equipment; delete data.hotbar;
+      delete data.survivalHotbar; delete data.selectedSlot;
+      return data;
+    }
+    function playerSaveData() {
+      return {
+        inventory:{...inventoryCounts}, equipment:{...equippedItems},
+        hotbar:hotbarSlots.slice(), survivalHotbar:savedSurvivalHotbar.slice(), selectedSlot,
+        health,hunger,thirst,bodyTemperature,
+        player:{x:player.pos.x,y:player.pos.y,z:player.pos.z,yaw:player.yaw,pitch:player.pitch,flying:player.flying}
+      };
+    }
+    function applyPlayerSaveData(data) {
+      if (!data||typeof data!=='object') return;
+      Object.keys(inventoryCounts).forEach(id=>delete inventoryCounts[id]);
+      Object.entries(data.inventory||{}).forEach(([id,count])=>{
+        const n=Number(id);
+        if (ITEM_INFO[n]&&Number.isInteger(count)&&count>0&&count<=ITEM_STACK_LIMIT&&Object.keys(inventoryCounts).length<INVENTORY_SLOT_LIMIT) inventoryCounts[n]=count;
+      });
+      Object.keys(equippedItems).forEach(slot=>{
+        const itemId=Number(data.equipment&&data.equipment[slot]);
+        equippedItems[slot]=ITEM_INFO[itemId]&&ITEM_INFO[itemId].equipmentSlot===slot?itemId:null;
+      });
+      const hotbar=Array.from({length:10},(_,i)=>data.hotbar&&ITEM_INFO[data.hotbar[i]]?data.hotbar[i]:null);
+      clearDuplicateHotbarItems(hotbar); hotbarSlots.splice(0,hotbarSlots.length,...hotbar);
+      savedSurvivalHotbar=Array.from({length:10},(_,i)=>data.survivalHotbar&&ITEM_INFO[data.survivalHotbar[i]]?data.survivalHotbar[i]:null);
+      clearDuplicateHotbarItems(savedSurvivalHotbar);
+      selectedSlot=Number.isInteger(data.selectedSlot)?Math.max(0,Math.min(9,data.selectedSlot)):0;
+      if (Number.isFinite(data.health)) health=Math.max(0,Math.min(20,data.health));
+      if (Number.isFinite(data.hunger)) hunger=Math.max(0,Math.min(20,data.hunger));
+      if (Number.isFinite(data.thirst)) thirst=Math.max(0,Math.min(20,data.thirst));
+      if (Number.isFinite(data.bodyTemperature)) bodyTemperature=Math.max(30,Math.min(43,data.bodyTemperature));
+      const saved=data.player||{};
+      if ([saved.x,saved.y,saved.z].every(Number.isFinite)&&Math.abs(saved.x)<=WORLD_LIMIT&&Math.abs(saved.z)<=WORLD_LIMIT&&saved.y>-100&&saved.y<10000) {
+        player.pos.set(saved.x,saved.y,saved.z); player.vel.set(0,0,0);
+      }
+      if (Number.isFinite(saved.yaw)) player.yaw=saved.yaw;
+      if (Number.isFinite(saved.pitch)) player.pitch=Math.max(-1.55,Math.min(1.55,saved.pitch));
+      player.flying=isCreative&&!!saved.flying;
+      lastBodyTempDisplay=NaN; renderHotbar(); renderHearts(); renderInventory();
+    }
+    async function savePlayerToCloud(options={}) {
+      if (!multiplayerRoomId||!multiplayerPlayerId||!multiplayerPlayerToken) return false;
+      try {
+        await callWorldApi('save_player',{
+          world_id:multiplayerRoomId,player_id:multiplayerPlayerId,
+          player_token:multiplayerPlayerToken,save_data:playerSaveData()
+        },options);
+        return true;
+      } catch (error) {
+        if (/banned|kicked|invalid player session/i.test(String(error&&error.message||''))) handleForcedRoomExit(error.message);
+        else console.warn('Player auto-save failed:',error);
+        return false;
+      }
+    }
+    async function saveWorldToCloud(options={}) {
+      if (!multiplayerRoomId||!multiplayerIsHost||!multiplayerHostToken) {
+        showToast('Only the host can save the shared world'); return false;
+      }
+      try {
+        await callWorldApi('save_world',{
+          world_id:multiplayerRoomId,host_token:multiplayerHostToken,
+          world_data:sharedWorldSaveData(),mode:multiplayerRoomMode,
+          seed:multiplayerRoomSeed,visibility:multiplayerRoomVisibility
+        },options);
+        multiplayerLastWorldSave=Date.now();
+        if (!options.silent) showToast('Shared world synced');
+        return true;
+      } catch (error) { showToast(`World save failed: ${error.message}`); return false; }
+    }
+    async function requestOnlinePlayersToSaveBackup() {
+      if (!multiplayerChannel||!multiplayerIsHost) return {saved:0,missing:0,failed:0};
+      const expected=new Set();
+      Object.values(multiplayerChannel.presenceState()).forEach(entries=>entries.forEach(entry=>{
+        if (entry&&entry.playerId&&entry.playerId!==multiplayerPlayerId) expected.add(entry.playerId);
+      }));
+      if (!expected.size) return {saved:0,missing:0,failed:0};
+      const requestId=randomMultiplayerId();
+      return await new Promise(resolve=>{
+        const finish=()=>{
+          if (multiplayerBackupWaiter!==waiter) return;
+          clearTimeout(timer);
+          multiplayerBackupWaiter=null;
+          const results=Array.from(waiter.results.values());
+          resolve({
+            saved:results.filter(Boolean).length,
+            failed:results.filter(value=>value===false).length,
+            missing:Math.max(0,expected.size-results.length)
+          });
+        };
+        const waiter={requestId,expected,results:new Map(),finish};
+        const timer=setTimeout(finish,6000);
+        multiplayerBackupWaiter=waiter;
+        sendMultiplayerEvent('backup-save-request',{requestId});
+      });
+    }
+    function downloadJsonFile(data,fileName) {
+      const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+      const link=document.createElement('a');
+      link.href=url; link.download=fileName;
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1500);
+    }
+    async function downloadMultiplayerBackup() {
+      if (!multiplayerChannel||!multiplayerIsHost||!multiplayerRoomId||!multiplayerHostToken) {
+        showToast('Only the host can create a multiplayer backup'); return false;
+      }
+      try {
+        if (!await savePlayerToCloud()) throw new Error('Your player save could not be synced. Backup was not created.');
+        const onlineResults=await requestOnlinePlayersToSaveBackup();
+        if (!await saveWorldToCloud({silent:true})) throw new Error('The shared world could not be synced. Backup was not created.');
+        const result=await callWorldApi('create_backup',{
+          world_id:multiplayerRoomId,
+          host_token:multiplayerHostToken,
+          host_player_id:multiplayerPlayerId,
+          host_player_token:multiplayerPlayerToken
+        });
+        if (!result.backup||result.backup.format!=='voxel-multiplayer-backup') throw new Error('The backup service returned an invalid backup.');
+        const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+        downloadJsonFile(result.backup,`voxel-multiplayer-backup-${multiplayerRoomId}-${stamp}.json`);
+        const warningCount=onlineResults.failed+onlineResults.missing;
+        if (warningCount) {
+          showToast(`Backup downloaded; ${warningCount} online player save(s) did not confirm`);
+          setMultiplayerStatus(`Backup downloaded. ${warningCount} online player save(s) did not confirm, so their included positions may be from their last cloud save.`);
+        } else {
+          showToast(`Complete backup downloaded · ${result.backup.players.length} player(s)`);
+          setMultiplayerStatus(`Complete backup downloaded with the shared world and ${result.backup.players.length} player save(s).`);
+        }
+        return true;
+      } catch (error) {
+        showToast(`Backup failed: ${error.message}`);
+        setMultiplayerStatus(`Backup failed: ${error.message}`);
+        return false;
+      }
+    }
+    async function importMultiplayerBackup(backup) {
+      if (!backup||backup.format!=='voxel-multiplayer-backup'||backup.version!==1||
+          !backup.world||!Array.isArray(backup.players)||!backup.host||
+          !backup.world.world_data||!Array.isArray(backup.world.world_data.blocks)||
+          !Array.isArray(backup.world.world_data.generatedChunks)) {
+        throw new Error('This is not a valid multiplayer backup JSON.');
+      }
+      const host=backup.players.find(profile=>profile&&profile.is_host===true&&profile.player_id===backup.host.player_id);
+      if (!host||typeof backup.host.host_token!=='string'||typeof backup.host.player_token!=='string') {
+        throw new Error('The backup is missing its host credentials or host player save.');
+      }
+      if (multiplayerChannel) {
+        if (multiplayerIsHost&&multiplayerRoomId&&multiplayerHostToken) {
+          try { await callWorldApi('mark_host_offline',{world_id:multiplayerRoomId,host_token:multiplayerHostToken}); } catch (_) {}
+        }
+        disconnectMultiplayerRoom();
+        updateMultiplayerControls();
+      }
+      setMultiplayerStatus('Restoring the world and every saved player from backup…');
+      await callWorldApi('restore_backup',{backup});
+      storeHostSession(backup.world.id,backup.host.host_token,backup.host.player_id,backup.host.player_token);
+      storePlayerSession(backup.world.id,backup.host.player_id,backup.host.player_token);
+      multiplayerImportedBackup=true;
+      multiplayerRoomMode=backup.world.mode;
+      multiplayerRoomSeed=Number(backup.world.seed)>>>0;
+      multiplayerRoomVisibility=backup.world.visibility||'private';
+      loadWorldData(backup.world.world_data);
+      if (host.save_data) applyPlayerSaveData(host.save_data);
+      updateMultiplayerControls();
+      showToast(`Backup restored · ${backup.players.length} saved player(s)`);
+      setMultiplayerStatus(`Backup restored. ${backup.players.length} player save(s) are ready. Open Multiplayer and choose Resume Saved Host World to start the server.`);
+    }
+
+    function handleForcedRoomExit(message) {
+      if (!multiplayerChannel) return;
+      const oldChannel=multiplayerChannel;
+      if (multiplayerClient) multiplayerClient.removeChannel(oldChannel);
+      multiplayerChannel=null; multiplayerIsHost=false; multiplayerHud.hidden=true;
+      multiplayerChatPanel.hidden=true; hostPlayersPanel.hidden=true;
+      pendingWorldSnapshots.clear(); clearRemotePlayers();
+      gameStarted=false;
+      if (document.pointerLockElement) document.exitPointerLock();
+      overlay.style.display='flex'; mainMenu.hidden=true; multiplayerMenu.hidden=false;
+      updateMultiplayerControls();
+      setMultiplayerStatus(message||'You no longer have access to this world.');
+      showToast(message||'Removed from the world');
+    }
     function setMultiplayerStatus(message) { multiplayerStatusEl.textContent=message; }
     function multiplayerErrorMessage(error) {
       const message=String(error&&error.message||'');
@@ -2306,8 +2585,11 @@
     function disconnectMultiplayerRoom() {
       if (multiplayerChannel&&multiplayerClient) multiplayerClient.removeChannel(multiplayerChannel);
       multiplayerChannel=null; multiplayerRoomId=''; multiplayerRoomCode=''; multiplayerIsHost=false;
+      multiplayerPlayerId=''; multiplayerPlayerToken=''; multiplayerHostToken='';
+      multiplayerPendingPlayerData=null; multiplayerLoadedSavedWorld=false;
       if (multiplayerJoinTimeout) { clearTimeout(multiplayerJoinTimeout); multiplayerJoinTimeout=null; }
       pendingWorldSnapshots.clear(); clearRemotePlayers(); multiplayerHud.hidden=true;
+      multiplayerChatPanel.hidden=true; hostPlayersPanel.hidden=true;
     }
     function cleanMultiplayerName(value) { return String(value||'Player').replace(/[<>\u0000-\u001F]/g,'').trim().slice(0,18)||'Player'; }
     async function connectMultiplayerRoom(roomId,isHost) {
@@ -2325,6 +2607,36 @@
         if (multiplayerIsHost&&message.payload&&message.payload.clientId!==multiplayerClientId) sendMultiplayerSnapshot(message.payload.clientId);
       });
       channel.on('broadcast',{event:'world-snapshot'},message=>receiveMultiplayerSnapshot(message.payload));
+      channel.on('broadcast',{event:'chest-change'},message=>{
+        const payload=message.payload;
+        if (!payload||!isValidMultiplayerKey(payload.key)||voxelMap.get(payload.key)!==33) return;
+        if (payload.contents===null) chestContents.delete(payload.key);
+        else if (payload.contents&&typeof payload.contents==='object') {
+          const contents=Object.create(null);
+          Object.entries(payload.contents).forEach(([id,count])=>{const n=Number(id);if(ITEM_INFO[n]&&Number.isInteger(count)&&count>0&&count<=ITEM_STACK_LIMIT)contents[n]=count;});
+          chestContents.set(payload.key,contents);
+        }
+        if (chestOpenKey===payload.key) renderInventory();
+      });
+      channel.on('broadcast',{event:'chat-message'},message=>receiveMultiplayerChat(message.payload));
+      channel.on('broadcast',{event:'backup-save-request'},message=>{
+        const payload=message.payload;
+        if (!payload||typeof payload.requestId!=='string'||!multiplayerRoomId) return;
+        (async()=>{
+          const ok=await savePlayerToCloud();
+          sendMultiplayerEvent('backup-save-ack',{requestId:payload.requestId,playerId:multiplayerPlayerId,ok});
+        })();
+      });
+      channel.on('broadcast',{event:'backup-save-ack'},message=>{
+        const payload=message.payload, waiter=multiplayerBackupWaiter;
+        if (!multiplayerIsHost||!waiter||!payload||payload.requestId!==waiter.requestId||!waiter.expected.has(payload.playerId)) return;
+        waiter.results.set(payload.playerId,payload.ok===true);
+        if (waiter.results.size>=waiter.expected.size) waiter.finish();
+      });
+      channel.on('broadcast',{event:'player-kicked'},message=>{
+        const payload=message.payload;
+        if (payload&&payload.targetPlayerId===multiplayerPlayerId) handleForcedRoomExit(payload.message||'The host removed you from this world.');
+      });
       channel.on('presence',{event:'sync'},syncRemotePlayersFromPresence);
       await new Promise((resolve,reject)=>{
         let settled=false;
@@ -2333,7 +2645,7 @@
           if (settled) return;
           if (status==='SUBSCRIBED') {
             try {
-              await channel.track({clientId:multiplayerClientId,name:multiplayerPlayerName,host:isHost,joinedAt:Date.now()});
+              await channel.track({clientId:multiplayerClientId,playerId:multiplayerPlayerId,name:multiplayerPlayerName,host:isHost,joinedAt:Date.now()});
               settled=true; clearTimeout(timeout); syncRemotePlayersFromPresence(); resolve();
             } catch (error) { settled=true; clearTimeout(timeout); reject(error); }
           } else if (status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED') {
@@ -2348,11 +2660,12 @@
     }
     async function sendMultiplayerSnapshot(targetClientId) {
       if (!multiplayerChannel||!multiplayerIsHost) return;
-      const entries=Array.from(multiplayerOverrides.entries()), pageSize=80;
+      const entries=Array.from(multiplayerOverrides.entries(),([key,id])=>[key,id,blockRotations.get(key)||0,openDoors.has(key)]), pageSize=80;
       const totalPages=Math.max(1,Math.ceil(entries.length/pageSize)), snapshotId=randomMultiplayerId();
       for (let page=0;page<totalPages;page++) {
         await multiplayerChannel.send({type:'broadcast',event:'world-snapshot',payload:{
           targetClientId,snapshotId,page,totalPages,seed:multiplayerRoomSeed,mode:multiplayerRoomMode,
+          worldState:page===0?{chests:Array.from(chestContents.entries()),mobs:mobs.map(mob=>({kind:mob.kind,x:mob.group.position.x,z:mob.group.position.z,dirX:mob.dirX,dirZ:mob.dirZ,turnTimer:mob.turnTimer,health:mob.health})),droppedItems:droppedItems.map(item=>({id:item.itemId,count:item.count,pos:item.pos.toArray(),vel:item.vel.toArray(),age:item.age}))}:null,
           entries:entries.slice(page*pageSize,(page+1)*pageSize)
         }}).catch(()=>{});
       }
@@ -2365,11 +2678,12 @@
           payload.page<0||payload.page>=payload.totalPages||!Array.isArray(payload.entries)||payload.entries.length>80) return;
       let snapshot=pendingWorldSnapshots.get(payload.snapshotId);
       if (!snapshot) {
-        snapshot={seed:payload.seed,mode:payload.mode,totalPages:payload.totalPages,pages:new Map()};
+        snapshot={seed:payload.seed,mode:payload.mode,totalPages:payload.totalPages,pages:new Map(),worldState:null};
         pendingWorldSnapshots.set(payload.snapshotId,snapshot);
       }
       if (snapshot.seed!==payload.seed||snapshot.mode!==payload.mode||snapshot.totalPages!==payload.totalPages) return;
       snapshot.pages.set(payload.page,payload.entries);
+      if (payload.page===0&&payload.worldState) snapshot.worldState=payload.worldState;
       if (snapshot.pages.size!==snapshot.totalPages) return;
       const overrides=[];
       for (let page=0;page<snapshot.totalPages;page++) overrides.push(...(snapshot.pages.get(page)||[]));
@@ -2378,9 +2692,27 @@
       multiplayerRoomMode=snapshot.mode;
       multiplayerRoomSeed=snapshot.seed;
       setMultiplayerStatus('World synced. Joining the room…');
-      resetWorldForMultiplayer(snapshot.seed,overrides);
+      if (multiplayerLoadedSavedWorld) {
+        for (const entry of overrides) {
+          if (!Array.isArray(entry)||!isValidMultiplayerKey(entry[0])||(entry[1]!==null&&!BLOCK_BY_ID[entry[1]])) continue;
+          const pos=decodeVoxelPosition(entry[0]);
+          if (entry[1]===null) { deleteVoxel(pos.x,pos.y,pos.z); blockRotations.delete(entry[0]); openDoors.delete(entry[0]); }
+          else { setVoxelAtKey(entry[0],pos.x,pos.z,entry[1]); if(Number.isFinite(entry[2]))blockRotations.set(entry[0],entry[2]); if(entry[3])openDoors.add(entry[0]); else openDoors.delete(entry[0]); }
+          cacheMultiplayerOverride(entry[0],entry[1]);
+        }
+      } else resetWorldForMultiplayer(snapshot.seed,overrides);
+      if (snapshot.worldState&&Array.isArray(snapshot.worldState.chests)) {
+        chestContents.clear();
+        snapshot.worldState.chests.forEach(entry=>{if(Array.isArray(entry)&&Number.isSafeInteger(entry[0])&&voxelMap.get(entry[0])===33){const c=Object.create(null);Object.entries(entry[1]||{}).forEach(([id,count])=>{const n=Number(id);if(ITEM_INFO[n]&&Number.isInteger(count)&&count>0&&count<=ITEM_STACK_LIMIT)c[n]=count;});chestContents.set(entry[0],c);}});
+        clearDroppedItems(); (snapshot.worldState.droppedItems||[]).forEach(item=>{if(ITEM_INFO[item.id]&&Number.isInteger(item.count)&&Array.isArray(item.pos)&&item.pos.every(Number.isFinite)){const pos=new THREE.Vector3(...item.pos);const vel=Array.isArray(item.vel)&&item.vel.every(Number.isFinite)?new THREE.Vector3(...item.vel):new THREE.Vector3();createDroppedItem(item.id,Math.min(item.count,ITEM_STACK_LIMIT),pos,vel,Number(item.age)||0);}});
+        restoreMobs(snapshot.worldState.mobs||[]);
+      }
+      rebuildVisibleInstances();
       multiplayerHud.hidden=false; multiplayerHudCode.textContent=multiplayerRoomCode.slice(0,8);
       chooseGameMode(snapshot.mode);
+      if (multiplayerPendingPlayerData) applyPlayerSaveData(multiplayerPendingPlayerData);
+      multiplayerPendingPlayerData=null; multiplayerLoadedSavedWorld=false;
+      updateMultiplayerControls();
     }
     function sendLocalPlayerPosition() {
       if (!multiplayerChannel||!gameStarted) return;
@@ -2389,12 +2721,20 @@
         x:player.pos.x,y:player.pos.y,z:player.pos.z,yaw:player.yaw
       });
     }
-    function enterMultiplayerGame(seed,mode) {
+    function enterMultiplayerGame(seed,mode,savedWorldData=null,savedPlayerData=null) {
       multiplayerRoomMode=mode; multiplayerRoomSeed=seed>>>0;
-      resetWorldForMultiplayer(seed,[]);
+      if (savedWorldData&&Array.isArray(savedWorldData.blocks)&&Array.isArray(savedWorldData.generatedChunks)) {
+        multiplayerOverrides.clear(); multiplayerOverridesByChunk.clear();
+        loadWorldData(savedWorldData); multiplayerLoadedSavedWorld=true;
+      } else { resetWorldForMultiplayer(seed,[]); multiplayerLoadedSavedWorld=false; }
       multiplayerMenu.hidden=true; mainMenu.hidden=true; settingsMenu.hidden=true; modeMenu.hidden=true;
       overlay.style.display='none';
       chooseGameMode(mode);
+      if (savedPlayerData) applyPlayerSaveData(savedPlayerData);
+      multiplayerPendingPlayerData=null;
+      multiplayerHud.hidden=false; multiplayerHudCode.textContent=multiplayerRoomCode.slice(0,8);
+      if (multiplayerIsHost&&!multiplayerLastWorldSave) multiplayerLastWorldSave=Date.now();
+      updateMultiplayerControls();
     }
     async function copyMultiplayerInvite() {
       if (!multiplayerRoomCode) return;
@@ -2405,51 +2745,234 @@
     }
 
     multiplayerButton.addEventListener('click',()=>{
-      if (hasPlayedBefore) return;
+      if (hasPlayedBefore&&!getLastHostSession()) return;
       multiplayerPlayerName=cleanMultiplayerName(document.getElementById('multiplayerName').value);
       multiplayerMenu.hidden=false; mainMenu.hidden=true; settingsMenu.hidden=true; modeMenu.hidden=true;
       document.getElementById('createdRoomCode').hidden=true;
-      setMultiplayerStatus(multiplayerClient?'Create a room or enter a friend’s invite code.':'Supabase is not available. Check your connection and reload.');
+      updateMultiplayerControls();
+      setMultiplayerStatus(multiplayerClient?'Create a new server, resume your saved host world, or join a friend.':'Supabase is not available. Check your connection and reload.');
     });
     document.getElementById('multiplayerBackButton').addEventListener('click',showMainMenu);
-    document.getElementById('createRoomButton').addEventListener('click',async()=>{
+    async function createMultiplayerRoom() {
       const button=document.getElementById('createRoomButton');
       multiplayerPlayerName=cleanMultiplayerName(document.getElementById('multiplayerName').value);
       document.getElementById('multiplayerName').value=multiplayerPlayerName;
-      const roomCode=randomMultiplayerId(), seed=window.crypto&&window.crypto.getRandomValues?window.crypto.getRandomValues(new Uint32Array(1))[0]:(Math.random()*4294967296)>>>0;
-      const roomMode=document.getElementById('multiplayerMode').value;
-      multiplayerRoomSeed=seed; multiplayerRoomMode=roomMode;
-      button.disabled=true; setMultiplayerStatus('Connecting to Supabase…');
+      const roomId=randomMultiplayerId(), playerId=randomMultiplayerId();
+      const seed=window.crypto&&window.crypto.getRandomValues?window.crypto.getRandomValues(new Uint32Array(1))[0]:(Math.random()*4294967296)>>>0;
+      const mode=document.getElementById('multiplayerMode').value;
+      multiplayerRoomVisibility=document.getElementById('roomVisibility').value;
+      multiplayerRoomMode=mode; multiplayerRoomSeed=seed; multiplayerIsHost=true; multiplayerImportedBackup=false;
+      button.disabled=true; setMultiplayerStatus('Creating your saved server world…');
       try {
-        await connectMultiplayerRoom(roomCode,true);
-        multiplayerRoomId=roomCode; multiplayerRoomCode=roomCode;
-        document.getElementById('createdRoomCodeText').textContent=roomCode;
+        const created=await callWorldApi('create_world',{
+          world_id:roomId,player_id:playerId,username:multiplayerPlayerName,
+          seed,mode,visibility:multiplayerRoomVisibility,world_name:`${multiplayerPlayerName}'s World`
+        });
+        multiplayerRoomId=roomId; multiplayerRoomCode=roomId;
+        multiplayerPlayerId=playerId; multiplayerHostToken=created.host_token; multiplayerPlayerToken=created.player_token;
+        storeHostSession(roomId,multiplayerHostToken,playerId,multiplayerPlayerToken);
+        storePlayerSession(roomId,playerId,multiplayerPlayerToken);
+        await connectMultiplayerRoom(roomId,true);
+        document.getElementById('createdRoomCodeText').textContent=roomId;
         document.getElementById('createdRoomCode').hidden=false;
-        enterMultiplayerGame(seed,roomMode);
-        showToast('Room created · press Esc to copy the invite code');
-      } catch (error) { setMultiplayerStatus(multiplayerErrorMessage(error)); }
-      finally { button.disabled=false; }
-    });
-    document.getElementById('joinRoomButton').addEventListener('click',async()=>{
+        enterMultiplayerGame(seed,mode);
+        await savePlayerToCloud();
+        await saveWorldToCloud();
+        setMultiplayerStatus('Your temporary server is online. The world is saved separately.');
+        showToast('Server world created · share the invite code');
+      } catch (error) {
+        if (multiplayerRoomId&&multiplayerHostToken) callWorldApi('mark_host_offline',{world_id:multiplayerRoomId,host_token:multiplayerHostToken}).catch(()=>{});
+        setMultiplayerStatus(multiplayerErrorMessage(error));
+      } finally { button.disabled=false; }
+    }
+    async function joinMultiplayerRoom(roomCode) {
       const button=document.getElementById('joinRoomButton');
       multiplayerPlayerName=cleanMultiplayerName(document.getElementById('multiplayerName').value);
       document.getElementById('multiplayerName').value=multiplayerPlayerName;
-      const roomCode=document.getElementById('roomCodeInput').value.toUpperCase().replace(/[^A-F0-9]/g,'');
-      if (roomCode.length!==32) { setMultiplayerStatus('Enter the full 32-character room invite code.'); return; }
-      button.disabled=true; setMultiplayerStatus('Joining room and waiting for its host…');
+      if (!roomCode||roomCode.length!==32) { setMultiplayerStatus('Enter the full 32-character room invite code.'); return; }
+      const saved=getSavedPlayerSession(roomCode);
+      const playerId=saved&&idOkForGame(saved.playerId)?saved.playerId:randomMultiplayerId();
+      button.disabled=true; setMultiplayerStatus('Checking the saved world and player session…');
       try {
+        const joined=await callWorldApi('join_world',{
+          world_id:roomCode,player_id:playerId,player_token:saved&&saved.playerToken,
+          username:multiplayerPlayerName
+        });
+        multiplayerRoomId=roomCode; multiplayerRoomCode=roomCode; multiplayerPlayerId=playerId;
+        multiplayerPlayerToken=joined.player_token; multiplayerHostToken=''; multiplayerIsHost=false;
+        multiplayerRoomMode=joined.world.mode; multiplayerRoomSeed=Number(joined.world.seed)>>>0;
+        multiplayerRoomVisibility=joined.world.visibility||'private';
+        multiplayerPendingPlayerData=joined.player_data||null;
+        storePlayerSession(roomCode,playerId,multiplayerPlayerToken);
+        if (joined.world.world_data&&Array.isArray(joined.world.world_data.blocks)&&Array.isArray(joined.world.world_data.generatedChunks)) {
+          multiplayerOverrides.clear(); multiplayerOverridesByChunk.clear();
+          loadWorldData(joined.world.world_data); multiplayerLoadedSavedWorld=true;
+        } else multiplayerLoadedSavedWorld=false;
         await connectMultiplayerRoom(roomCode,false);
-        multiplayerRoomId=roomCode; multiplayerRoomCode=roomCode;
-        sendMultiplayerEvent('sync-request',{clientId:multiplayerClientId});
+        sendMultiplayerEvent('sync-request',{clientId:multiplayerClientId,playerId:multiplayerPlayerId});
         multiplayerJoinTimeout=setTimeout(()=>{
-          if (!gameStarted&&multiplayerChannel) setMultiplayerStatus('The room is online, but its host has not replied. Check the invite code and make sure the host is still playing.');
+          if (!gameStarted&&multiplayerChannel) setMultiplayerStatus('The host is online but has not sent the live world yet. Check that the host is still playing.');
         },15000);
+      } catch (error) {
+        multiplayerPendingPlayerData=null; multiplayerLoadedSavedWorld=false;
+        setMultiplayerStatus(multiplayerErrorMessage(error));
+      } finally { button.disabled=false; }
+    }
+    async function resumeSavedHostWorld() {
+      const button=document.getElementById('resumeWorldButton'), saved=getLastHostSession();
+      if (!saved) { setMultiplayerStatus('No saved host world session is stored in this browser.'); updateMultiplayerControls(); return; }
+      button.disabled=true; setMultiplayerStatus('Reopening your saved server world…');
+      try {
+        const loaded=await callWorldApi('load_host_world',{world_id:saved.worldId,host_token:saved.hostToken});
+        multiplayerRoomId=saved.worldId; multiplayerRoomCode=saved.worldId;
+        multiplayerPlayerId=saved.playerId; multiplayerPlayerToken=saved.playerToken; multiplayerHostToken=saved.hostToken;
+        multiplayerIsHost=true; multiplayerRoomMode=loaded.world.mode; multiplayerRoomSeed=Number(loaded.world.seed)>>>0;
+        multiplayerRoomVisibility=loaded.world.visibility||'private';
+        await connectMultiplayerRoom(saved.worldId,true);
+        const savedWorld=loaded.world.world_data&&Array.isArray(loaded.world.world_data.blocks)?loaded.world.world_data:null;
+        multiplayerLastWorldSave=Date.now();
+        enterMultiplayerGame(multiplayerRoomSeed,multiplayerRoomMode,savedWorld,loaded.player_data||null);
+        multiplayerImportedBackup=false;
+        updateMultiplayerControls();
+        setMultiplayerStatus('Saved world reopened. Players can join while you are online.');
+        showToast('Saved world loaded');
       } catch (error) { setMultiplayerStatus(multiplayerErrorMessage(error)); }
       finally { button.disabled=false; }
+    }
+    function idOkForGame(value) { return typeof value==='string'&&/^[A-F0-9]{32}$/.test(value); }
+    async function refreshPublicRooms() {
+      const list=document.getElementById('publicRoomsList'), status=document.getElementById('roomFinderStatus');
+      list.innerHTML=''; status.textContent='Searching for online public worlds…';
+      try {
+        const result=await callWorldApi('list_public');
+        const rooms=Array.isArray(result.rooms)?result.rooms:[];
+        if (!rooms.length) { status.textContent='No public worlds are online right now.'; return; }
+        status.textContent=`${rooms.length} public world${rooms.length===1?'':'s'} online`;
+        rooms.forEach(room=>{
+          const row=document.createElement('div'); row.className='public-room-row';
+          const info=document.createElement('div'); info.className='public-room-info';
+          const name=document.createElement('div'); name.className='public-room-name'; name.textContent=room.world_name||'Minecraft World';
+          const meta=document.createElement('div'); meta.className='public-room-meta'; meta.textContent=`${String(room.mode||'classic').toUpperCase()} · Host online`;
+          const join=document.createElement('button'); join.type='button'; join.className='btn secondary'; join.textContent='JOIN';
+          join.addEventListener('click',()=>{
+            document.getElementById('roomCodeInput').value=room.id;
+            document.getElementById('roomFinderMenu').hidden=true;
+            multiplayerMenu.hidden=false;
+            document.getElementById('joinRoomButton').click();
+          });
+          info.append(name,meta); row.append(info,join); list.appendChild(row);
+        });
+      } catch (error) { status.textContent=`Could not find public worlds: ${error.message}`; }
+    }
+    async function refreshHostPlayers() {
+      if (!multiplayerIsHost||!multiplayerRoomId||!multiplayerHostToken) return;
+      hostPlayersListEl.textContent='Loading players…';
+      try {
+        const result=await callWorldApi('list_players',{world_id:multiplayerRoomId,host_token:multiplayerHostToken});
+        hostPlayersListEl.innerHTML='';
+        (result.players||[]).forEach(player=>{
+          const row=document.createElement('div'); row.className='host-player-row';
+          const info=document.createElement('div');
+          const title=document.createElement('strong'); title.textContent=player.username+(player.is_host?' · HOST':'');
+          const seen=Date.now()-Date.parse(player.last_seen_at||0);
+          const detail=document.createElement('small'); detail.textContent=player.is_host?'World owner':player.is_banned?'BANNED':seen<45000?'Online':'Offline';
+          info.append(title,detail); row.append(info);
+          if (!player.is_host) {
+            const actions=document.createElement('div'); actions.className='host-player-actions';
+            const actionButton=(label,action,danger=false)=>{const b=document.createElement('button');b.type='button';b.textContent=label;if(danger)b.classList.add('danger');b.addEventListener('click',()=>moderateMultiplayerPlayer(player.player_id,action));actions.appendChild(b);};
+            if (player.is_banned) actionButton('UNBAN','unban');
+            else { actionButton('KICK','kick',true); actionButton('BAN','ban',true); }
+            row.append(actions);
+          }
+          hostPlayersListEl.appendChild(row);
+        });
+        if (!(result.players||[]).length) hostPlayersListEl.textContent='No players have joined yet.';
+      } catch (error) { hostPlayersListEl.textContent=error.message; }
+    }
+    async function moderateMultiplayerPlayer(playerId,action) {
+      if (!multiplayerIsHost) return;
+      try {
+        await callWorldApi('moderate',{world_id:multiplayerRoomId,host_token:multiplayerHostToken,target_player_id:playerId,moderation:action});
+        if (action==='kick'||action==='ban') sendMultiplayerEvent('player-kicked',{targetPlayerId:playerId,message:action==='ban'?'You were banned by the host.':'You were kicked by the host.'});
+        showToast(`${action.toUpperCase()} applied`); await refreshHostPlayers();
+      } catch (error) { showToast(`Could not ${action}: ${error.message}`); }
+    }
+    function updateMultiplayerControls() {
+      const host=!!(multiplayerChannel&&multiplayerIsHost);
+      document.getElementById('playersToggleButton').hidden=!host;
+      document.getElementById('cloudSaveButton').hidden=!host;
+      const importBackupButton=document.getElementById('resumeWorldButton');
+      if (importBackupButton) { importBackupButton.hidden=false; importBackupButton.disabled=false; importBackupButton.textContent='IMPORT JSON BACKUP'; }
+      const save=document.getElementById('saveWorldButton'), load=document.getElementById('loadWorldButton');
+      if (save) { save.disabled=!!multiplayerChannel&&!host; save.textContent=multiplayerChannel?(host?'Save backup JSON':'Host saves backup'):'Save world JSON'; }
+      if (load) load.disabled=!!multiplayerChannel;
+    }
+    function appendMultiplayerChat(name,message) {
+      const line=document.createElement('div'); line.className='chat-line';
+      const who=document.createElement('strong'); who.textContent=`${String(name||'Player').slice(0,18)}:`;
+      const body=document.createElement('span'); body.textContent=String(message||'').slice(0,240);
+      line.append(who,body); chatMessagesEl.appendChild(line);
+      while (chatMessagesEl.children.length>60) chatMessagesEl.firstElementChild.remove();
+      chatMessagesEl.scrollTop=chatMessagesEl.scrollHeight;
+    }
+    function receiveMultiplayerChat(payload) {
+      if (!payload||typeof payload.message!=='string'||!payload.message.trim()) return;
+      appendMultiplayerChat(payload.name,payload.message.trim());
+    }
+    function submitMultiplayerChat(event) {
+      event.preventDefault();
+      const input=document.getElementById('chatInput'), message=input.value.trim().slice(0,240);
+      if (!message||!multiplayerChannel) return;
+      sendMultiplayerEvent('chat-message',{clientId:multiplayerClientId,playerId:multiplayerPlayerId,name:multiplayerPlayerName,message});
+      appendMultiplayerChat(multiplayerPlayerName,message); input.value='';
+    }
+    document.getElementById('createRoomButton').addEventListener('click',createMultiplayerRoom);
+    document.getElementById('resumeWorldButton').addEventListener('click',()=>document.getElementById('loadWorldInput').click());
+    document.getElementById('findRoomsButton').addEventListener('click',()=>{
+      multiplayerMenu.hidden=true; document.getElementById('roomFinderMenu').hidden=false; refreshPublicRooms();
     });
+    document.getElementById('refreshRoomsButton').addEventListener('click',refreshPublicRooms);
+    document.getElementById('roomFinderBackButton').addEventListener('click',()=>{
+      document.getElementById('roomFinderMenu').hidden=true; multiplayerMenu.hidden=false;
+    });
+    document.getElementById('joinRoomButton').addEventListener('click',()=>{
+      const roomCode=document.getElementById('roomCodeInput').value.toUpperCase().replace(/[^A-F0-9]/g,'');
+      joinMultiplayerRoom(roomCode);
+    });
+    document.getElementById('playersToggleButton').addEventListener('click',()=>{
+      hostPlayersPanel.hidden=!hostPlayersPanel.hidden;
+      if (!hostPlayersPanel.hidden) { multiplayerChatPanel.hidden=true; refreshHostPlayers(); }
+    });
+    document.getElementById('closePlayersButton').addEventListener('click',()=>hostPlayersPanel.hidden=true);
+    document.getElementById('refreshPlayersButton').addEventListener('click',refreshHostPlayers);
+    document.getElementById('chatToggleButton').addEventListener('click',()=>{
+      multiplayerChatPanel.hidden=!multiplayerChatPanel.hidden;
+      if (!multiplayerChatPanel.hidden) { hostPlayersPanel.hidden=true; if(document.pointerLockElement)document.exitPointerLock(); document.getElementById('chatInput').focus(); }
+    });
+    document.getElementById('closeChatButton').addEventListener('click',()=>multiplayerChatPanel.hidden=true);
+    document.getElementById('chatForm').addEventListener('submit',submitMultiplayerChat);
+    document.getElementById('cloudSaveButton').addEventListener('click',downloadMultiplayerBackup);
     document.getElementById('copyRoomCodeButton').addEventListener('click',copyMultiplayerInvite);
     document.getElementById('copyInviteButton').addEventListener('click',copyMultiplayerInvite);
-    window.addEventListener('beforeunload',()=>{if(multiplayerChannel&&multiplayerClient)multiplayerClient.removeChannel(multiplayerChannel);});
+    window.addEventListener('beforeunload',()=>{
+      if (multiplayerChannel&&multiplayerClient) multiplayerClient.removeChannel(multiplayerChannel);
+      if (multiplayerRoomId&&multiplayerPlayerId&&multiplayerPlayerToken) {
+        callWorldApi('save_player',{world_id:multiplayerRoomId,player_id:multiplayerPlayerId,player_token:multiplayerPlayerToken,save_data:playerSaveData()},{keepalive:true}).catch(()=>{});
+      }
+      if (multiplayerRoomId&&multiplayerIsHost&&multiplayerHostToken) {
+        callWorldApi('mark_host_offline',{world_id:multiplayerRoomId,host_token:multiplayerHostToken},{keepalive:true}).catch(()=>{});
+      }
+    });
+    setInterval(async()=>{
+      if (!multiplayerChannel||!multiplayerRoomId||!multiplayerPlayerId||!multiplayerPlayerToken) return;
+      try {
+        await callWorldApi('heartbeat',{world_id:multiplayerRoomId,player_id:multiplayerPlayerId,player_token:multiplayerPlayerToken});
+      } catch (error) {
+        if (/banned|kicked|invalid player session/i.test(String(error&&error.message||''))) { handleForcedRoomExit(error.message); return; }
+      }
+      if (gameStarted) await savePlayerToCloud();
+      if (multiplayerIsHost&&gameStarted&&Date.now()-multiplayerLastWorldSave>45000) await saveWorldToCloud();
+    },20000);
 
     playBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2474,6 +2997,11 @@
     graphicsQualitySetting.addEventListener('change',()=>setGraphicsQuality(graphicsQualitySetting.value));
 
     window.addEventListener('keydown', (e) => {
+      const typingTarget=e.target&&e.target.closest&&e.target.closest('input,textarea,select,[contenteditable="true"]');
+      if (typingTarget) {
+        if (e.code==='Escape'&&typingTarget.closest('#multiplayerChat')) { multiplayerChatPanel.hidden=true; document.body.focus(); }
+        return;
+      }
       if (e.repeat && ['KeyE','KeyM','KeyR','Escape','KeyQ','KeyG'].includes(e.code)) return;
       if (!gameStarted && settingsMenu.hidden && modeMenu.hidden && multiplayerMenu.hidden && (e.code === 'Enter' || e.code === 'Space')) {
         if (hasPlayedBefore) startGame();
@@ -2496,17 +3024,19 @@
       }
       if (e.code === 'Escape') {
         if (!quitPrompt.hidden) showMainMenu();
-        else if (inventoryPanel.classList.contains('open')) { chestOpenKey=null; toggleInventory(false); }
+        else if (inventoryPanel.classList.contains('open')) { chestOpenKey=null; craftingTableOpen=false; craftingStationId=null; toggleInventory(false); }
         else if (!gameStarted&&(!settingsMenu.hidden||!modeMenu.hidden||!multiplayerMenu.hidden)) showMainMenu();
         else { gameStarted=false; showMainMenu(); if (document.pointerLockElement) document.exitPointerLock(); }
       }
       if (e.code === 'KeyE' && gameStarted) {
-        if (inventoryPanel.classList.contains('open')) { chestOpenKey=null; craftingTableOpen=false; toggleInventory(false); }
+        if (inventoryPanel.classList.contains('open')) { chestOpenKey=null; craftingTableOpen=false; craftingStationId=null; toggleInventory(false); }
         else {
           const targeted=raycastVoxel();
           if (toggleRedstoneLeverAt(targeted)) return;
+          if (targeted&&(targeted.id===44||targeted.id===46)) { toggleDoorAt(targeted); return; }
           chestOpenKey=targeted&&targeted.id===33?keyOf(targeted.x,targeted.y,targeted.z):null;
-          craftingTableOpen=!!(targeted&&targeted.id===18);
+          craftingStationId=targeted&&[17,18,36].includes(targeted.id)?targeted.id:null;
+          craftingTableOpen=craftingStationId===18;
           if (chestOpenKey!==null && !chestContents.has(chestOpenKey)) chestContents.set(chestOpenKey,Object.create(null));
           toggleInventory(true);
         }
@@ -2579,7 +3109,7 @@
         const contents=chestContents.get(chestOpenKey)||Object.create(null), amount=contents[itemId]||0;
         if (isCreative) delete contents[itemId];
         else if (amount && spawnDroppedItem(itemId,amount)) delete contents[itemId];
-        chestContents.set(chestOpenKey,contents); renderInventory(); return;
+        chestContents.set(chestOpenKey,contents); sendMultiplayerEvent('chest-change',{key:chestOpenKey,contents:{...contents}}); renderInventory(); return;
       }
       if (isCreative) {
         let removed=false;
@@ -2593,12 +3123,21 @@
         }
       }
     });
-    document.getElementById('saveWorldButton').addEventListener('click',downloadWorldJson);
+    document.getElementById('saveWorldButton').addEventListener('click',()=>{
+      if (multiplayerChannel) { if (multiplayerIsHost) downloadMultiplayerBackup(); else showToast('Only the host can create a multiplayer backup'); }
+      else downloadWorldJson();
+    });
     document.getElementById('loadWorldButton').addEventListener('click',()=>document.getElementById('loadWorldInput').click());
     document.getElementById('loadWorldInput').addEventListener('change',event=>{
       const file=event.target.files&&event.target.files[0]; if(!file) return;
       const reader=new FileReader();
-      reader.onload=()=>{try{loadWorldData(JSON.parse(reader.result));}catch(error){showToast('Could not load that world JSON');}};
+      reader.onload=async()=>{
+        try {
+          const parsed=JSON.parse(reader.result);
+          if (parsed&&parsed.format==='voxel-multiplayer-backup') await importMultiplayerBackup(parsed);
+          else loadWorldData(parsed);
+        } catch(error) { showToast(`Could not import backup: ${error.message||'Invalid JSON'}`); }
+      };
       reader.onerror=()=>showToast('Could not read that world file');
       reader.readAsText(file); event.target.value='';
     });
@@ -2771,9 +3310,12 @@
         const contents=chestContents.get(blockKey);
         if (!isCreative && contents) Object.entries(contents).forEach(([id,count])=>spawnDroppedItem(Number(id),count));
         chestContents.delete(blockKey);
+        sendMultiplayerEvent('chest-change',{key:blockKey,contents:null});
       }
-      deleteVoxel(hit.x,hit.y,hit.z);
-      recordMultiplayerBlockChange(blockKey,null);
+      if (hit.id===44||hit.id===46) {
+        const bottomY=hit.id===46?hit.y-1:hit.y, topY=bottomY+1;
+        for (const y of [bottomY,topY]) { const key=keyOf(hit.x,y,hit.z); if(voxelMap.has(key)){deleteVoxel(hit.x,y,hit.z);blockRotations.delete(key);openDoors.delete(key);recordMultiplayerBlockChange(key,null);} }
+      } else { deleteVoxel(hit.x,hit.y,hit.z); blockRotations.delete(blockKey); openDoors.delete(blockKey); recordMultiplayerBlockChange(blockKey,null); }
       if (hit.id===6) queueLeafDecayAround(hit.x,hit.y,hit.z);
       if (REDSTONE_NODE_IDS.has(hit.id)) recomputeRedstonePower();
       playSound('break',hit.id);
@@ -2783,7 +3325,7 @@
         const required=bInfo.requiredPickaxe||0;
         const canHarvest=required===0 || (held&&held.toolType==='pickaxe'&&toolLevel>=required);
         if (canHarvest) {
-          const dropId=bInfo.dropItem===undefined?bInfo.id:bInfo.dropItem;
+          const dropId=(hit.id===44||hit.id===46)?44:(bInfo.dropItem===undefined?bInfo.id:bInfo.dropItem);
           if (!addItem(dropId,1)) spawnDroppedItem(dropId,1);
           if (bInfo.id===10 && Math.random()<0.12 && !addItem(20,1)) spawnDroppedItem(20,1);
         } else if (required>0) showToast(required>1?'A stone pickaxe is needed to harvest this':'A wooden pickaxe is needed to harvest this');
@@ -2858,15 +3400,24 @@
       if ((inventoryCounts[outputId]||0)>=ITEM_STACK_LIMIT) return false;
       return inventorySpaceForItem(outputId)>0||(!isCreative&&(inventoryCounts[consumedId]||0)===1);
     }
+    function openWorkstation(hit) {
+      if (!hit||![17,18,36].includes(hit.id)) return false;
+      chestOpenKey=null; craftingStationId=hit.id; craftingTableOpen=hit.id===18; toggleInventory(true); return true;
+    }
+    function toggleDoorAt(hit) {
+      if (!hit||(hit.id!==44&&hit.id!==46)) return false;
+      const bottomY=hit.id===46?hit.y-1:hit.y, bottomKey=keyOf(hit.x,bottomY,hit.z), topKey=keyOf(hit.x,bottomY+1,hit.z);
+      const opening=!openDoors.has(bottomKey);
+      if (opening) { openDoors.add(bottomKey); openDoors.add(topKey); }
+      else { openDoors.delete(bottomKey); openDoors.delete(topKey); }
+      recordMultiplayerBlockChange(bottomKey,44); recordMultiplayerBlockChange(topKey,46);
+      rebuildVisibleInstances(); playSound('ui'); return true;
+    }
     function placeTargetedBlock() {
       const hit=raycastVoxel();
       if (toggleRedstoneLeverAt(hit)) return;
-      if (hit&&hit.id===18) {
-        chestOpenKey=null;
-        craftingTableOpen=true;
-        toggleInventory(true);
-        return;
-      }
+      if (hit&&(hit.id===44||hit.id===46)) { toggleDoorAt(hit); return; }
+      if (openWorkstation(hit)) return;
       const selectedItem=ITEM_INFO[hotbarSlots[selectedSlot]];
       if (selectedItem&&(selectedItem.foodValue||selectedItem.thirstValue||selectedItem.healValue)) { eatSelectedFood(); return; }
       const selectedItemId=hotbarSlots[selectedSlot];
@@ -2896,6 +3447,7 @@
 
       if (Math.abs(nx) > WORLD_LIMIT || Math.abs(nz) > WORLD_LIMIT) return;
       if (voxelMap.has(keyOf(nx, ny, nz))) return;
+      if (hotbarSlots[selectedSlot]!==null&&ITEM_INFO[hotbarSlots[selectedSlot]]?.blockId===44&&voxelMap.has(keyOf(nx,ny+1,nz))) { showToast('There is not enough room for the door'); return; }
 
       // Check AABB overlap between placed block [nx-0.5, nx+0.5] and player bounding box
       const pMinX = player.pos.x - player.radius;
@@ -2926,11 +3478,18 @@
       }
       const placedKey=keyOf(nx,ny,nz);
       setVoxel(nx,ny,nz,item.blockId);
+      if (item.blockId===44) setVoxel(nx,ny+1,nz,46);
+      const facing=Math.round((player.yaw-Math.PI)/(Math.PI/2))*(Math.PI/2);
+      blockRotations.set(placedKey,facing);
+      if (item.blockId===44) { const upperKey=keyOf(nx,ny+1,nz); blockRotations.set(upperKey,facing); openDoors.delete(placedKey); openDoors.delete(upperKey); recordMultiplayerBlockChange(upperKey,46); }
       recordMultiplayerBlockChange(placedKey,item.blockId);
       playSound('place');
       if (item.blockId===6) queueLeafDecayAround(nx,ny,nz);
       if (REDSTONE_NODE_IDS.has(item.blockId)) recomputeRedstonePower();
-      if (item.blockId===33 && !chestContents.has(placedKey)) chestContents.set(placedKey,Object.create(null));
+      if (item.blockId===33 && !chestContents.has(placedKey)) {
+        chestContents.set(placedKey,Object.create(null));
+        sendMultiplayerEvent('chest-change',{key:placedKey,contents:{}});
+      }
       if (!isCreative) {
         inventoryCounts[itemId]--;
         if (inventoryCounts[itemId]<=0) delete inventoryCounts[itemId];
@@ -2943,10 +3502,11 @@
       if (!isCreative) return;
       const hit=raycastVoxel();
       if (!hit || !BLOCK_BY_ID[hit.id]) return;
-      let slot=hotbarSlots.indexOf(hit.id);
+      const pickedId=hit.id===46?44:hit.id;
+      let slot=hotbarSlots.indexOf(pickedId);
       if (slot<0) slot=hotbarSlots.findIndex(itemId=>itemId===null);
       if (slot<0) slot=selectedSlot;
-      hotbarSlots[slot]=hit.id;
+      hotbarSlots[slot]=pickedId;
       selectedSlot=slot;
       renderHotbar(); renderInventory();
     }
@@ -2954,7 +3514,7 @@
     // Pointer lock retargets mouse events to the locked element (the body),
     // so listen on document to keep all mouse buttons working in and out of lock.
     document.addEventListener('mousedown', (e) => {
-      if (e.target.closest && e.target.closest('#overlay, #inventoryPanel, #hotbar')) return;
+      if (e.target.closest && e.target.closest('#overlay, #inventoryPanel, #hotbar, #multiplayerHud, .multiplayer-float-panel')) return;
       if (!gameStarted || inventoryPanel.classList.contains('open')) return;
       if (document.pointerLockElement !== document.body) requestGamePointerLock();
 
@@ -2967,6 +3527,12 @@
         if (isCreative) pickTargetedBlock();
       } else if (e.button === 2) {
         e.preventDefault();
+        const hit=raycastVoxel();
+        if (toggleRedstoneLeverAt(hit)) return;
+        if (hit&&(hit.id===44||hit.id===46)) { toggleDoorAt(hit); return; }
+        if ((hotbarSlots[selectedSlot]===132&&hit&&hit.id===34)||(hotbarSlots[selectedSlot]===133&&hit&&hit.id===36)) { placeTargetedBlock(); return; }
+        if (openWorkstation(hit)) return;
+        if (hit&&hit.id===33) { chestOpenKey=keyOf(hit.x,hit.y,hit.z); craftingTableOpen=false; craftingStationId=null; if(!chestContents.has(chestOpenKey))chestContents.set(chestOpenKey,Object.create(null)); toggleInventory(true); return; }
         placeTargetedBlock();
       }
     });
@@ -2988,7 +3554,22 @@
         for (let y = minY; y <= maxY; y++) {
           for (let z = minZ; z <= maxZ; z++) {
             const id=voxelMap.get(keyOf(x,y,z));
-            if (id!==undefined&&BLOCK_BY_ID[id]&&BLOCK_BY_ID[id].solid!==false) return true;
+            const packed=keyOf(x,y,z);
+            if (id===44||id===46) {
+              const bottomKey=id===46?keyOf(x,y-1,z):packed;
+              if (openDoors.has(bottomKey)) continue;
+              const rotation=blockRotations.get(packed)||0, dx=pos.x-x, dz=pos.z-z;
+              const localX=dx*Math.cos(rotation)-dz*Math.sin(rotation), localZ=dx*Math.sin(rotation)+dz*Math.cos(rotation);
+              if (Math.abs(localX)<0.5+player.radius&&Math.abs(localZ)<0.08+player.radius) return true;
+            } else if (id===45) {
+              const rotation=blockRotations.get(packed)||0, dx=pos.x-x, dz=pos.z-z;
+              const localX=dx*Math.cos(rotation)-dz*Math.sin(rotation), localZ=dx*Math.sin(rotation)+dz*Math.cos(rotation);
+              const horizontalFull=Math.abs(dx)<0.5+player.radius&&Math.abs(dz)<0.5+player.radius;
+              const lowerOverlap=pos.y-player.height+0.05<y&&pos.y+0.15>y-0.5&&horizontalFull;
+              const upperFootprint=localX>-0.5-player.radius&&localX<player.radius&&Math.abs(localZ)<0.5+player.radius;
+              const upperOverlap=pos.y-player.height+0.05<y+0.5&&pos.y+0.15>y&&upperFootprint;
+              if (lowerOverlap||upperOverlap) return true;
+            } else if (id!==undefined&&BLOCK_BY_ID[id]&&BLOCK_BY_ID[id].solid!==false) return true;
           }
         }
       }
