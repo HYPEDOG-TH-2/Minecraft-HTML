@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Minecraft HTML - Depths &amp; Crafting</title>
+  <title>Craft Online - Nightfall</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body tabindex="0">
@@ -27,8 +27,8 @@
       <div id="hostPlayersList"></div>
       <button type="button" class="panel-refresh-button" id="refreshPlayersButton">REFRESH PLAYERS</button>
     </section>
-    <div>Biome: <span id="biomeLabel">Plains</span> | Temp: <span id="temperatureLabel">15°C</span> | Seed: <span id="seedLabel"></span></div>
-    <div>Mine/Attack: Left Click / [Q] | Place/Use: Right Click / [F] | Inventory: [E]</div>
+    <div>Day <span id="dayNumber">1</span> · <span id="dayPhase">Morning</span> | Biome: <span id="biomeLabel">Plains</span> | Temp: <span id="temperatureLabel">15°C</span> | Seed: <span id="seedLabel"></span></div>
+    <div>Attack with swords: Left Click / [Q] | Place/Use: Right Click / [F] | Inventory: [E]</div>
     <div>Drop: [G] / [Shift+G] stack | Creative pick: Middle Click</div>
   </div>
   <div id="statusBars"><div id="hearts"></div><div id="hunger"></div><div id="thirst" aria-label="Thirst"></div><div id="bodyTempBar" aria-label="Body temperature"></div></div>
@@ -61,7 +61,7 @@
   <div id="overlay">
     <section class="menu-card" id="mainMenu">
       <div class="menu-kicker">A tiny block-building adventure</div>
-      <h1 id="menuTitle">MINECRAFT <span>HTML</span></h1>
+      <h1 id="menuTitle">CRAFT <span>ONLINE</span></h1>
       <p class="menu-subtitle">Explore, mine, craft and build your own world.</p>
       <div class="menu-actions">
         <button class="btn" id="playBtn">PLAY</button>
@@ -70,32 +70,39 @@
         <button class="btn secondary" id="quitButton" hidden>QUIT</button>
       </div>
       <p id="roomCodePause" class="room-code-pause" hidden>Room invite code: <strong id="pauseRoomCode"></strong> <button class="btn secondary" id="copyInviteButton" type="button">COPY</button></p>
-      <p class="menu-controls"><strong>WASD</strong> move · <strong>Space</strong> jump · <strong>Mouse</strong> look<br><strong>E</strong> inventory · <strong>Esc</strong> pause · <strong>Water:</strong> Space up, Shift down</p>
+      <p class="menu-controls"><strong>WASD</strong> move · <strong>Space</strong> jump · <strong>Mouse</strong> look<br><strong>E</strong> inventory · <strong>M</strong> cycle world mode · <strong>Esc</strong> pause · <strong>Water:</strong> Space up, Shift down</p>
     </section>
     <section class="menu-card multiplayer-card" id="multiplayerMenu" hidden>
       <div class="menu-kicker">Play together</div>
       <h2>MULTIPLAYER</h2>
+      <div class="mp-step-indicator" id="mpStepIndicator">STEP 1 OF 3 · SIGN IN</div>
+      <button class="btn secondary multiplayer-wide account-signout" id="accountSignOutButton" type="button" hidden>SIGN OUT OF THIS TAB</button>
+      <section class="mp-stage" id="mpStage1"><div class="mp-account-card"><strong id="accountLabel">Craft Online Accounts</strong><div class="mp-account-actions"><button class="btn" id="createAccountButton" type="button">CREATE ACCOUNT</button><button class="btn secondary" id="loginAccountButton" type="button">LOG IN</button><button class="btn secondary" id="guestAccountButton" type="button">CONTINUE AS GUEST</button></div><form id="craftAccountForm" class="craft-account-form" hidden><label class="multiplayer-field" id="accountUsernameField" for="accountUsername"><span>Username</span><input id="accountUsername" type="text" minlength="3" maxlength="18" autocomplete="username" placeholder="Your player name"></label><label class="multiplayer-field" id="accountEmailField" for="accountEmail"><span>Email address</span><input id="accountEmail" type="email" maxlength="254" autocomplete="email" required placeholder="you@example.com"></label><label class="multiplayer-field" for="accountPassword"><span>Password</span><input id="accountPassword" type="password" minlength="8" maxlength="72" autocomplete="current-password" required placeholder="At least 8 characters"></label><button class="btn multiplayer-wide" id="accountSubmitButton" type="submit">CREATE ACCOUNT</button><button class="btn secondary multiplayer-wide" id="forgotPasswordButton" type="button" hidden>EMAIL ME A PASSWORD RESET LINK</button><button class="btn secondary multiplayer-wide" id="accountCancelButton" type="button">CANCEL</button></form><p id="accountStatus" class="multiplayer-status" aria-live="polite">Create an account with email and password, log in, or continue as a guest.</p></div></section>
+      <section class="mp-stage" id="mpStage2" hidden><div class="mp-profile"><div class="default-skins"><span>Choose a default skin</span><div class="default-skin-grid"><button type="button" class="skin-choice" data-skin="adventurer">🧑 Adventurer</button><button type="button" class="skin-choice" data-skin="forest">🌲 Forest</button><button type="button" class="skin-choice" data-skin="ember">🔥 Ember</button><button type="button" class="skin-choice" data-skin="ocean">🌊 Ocean</button></div></div><label class="multiplayer-field" for="skinUpload"><span>Or upload a skin (PNG/JPG)</span><input id="skinUpload" type="file" accept="image/png,image/jpeg"></label><button class="btn secondary" id="clearSkinButton" type="button">RESET SKIN</button></div>
       <label class="multiplayer-field" for="multiplayerName"><span>Player name</span><input id="multiplayerName" type="text" maxlength="18" value="Player" autocomplete="nickname"></label>
-      <label class="multiplayer-field" for="multiplayerMode"><span>World mode (host chooses)</span><select id="multiplayerMode"><option value="classic">Classic</option><option value="realistic">Realistic</option><option value="creative">Creative</option></select></label>
-      <label class="multiplayer-field" for="roomVisibility"><span>Room visibility</span><select id="roomVisibility"><option value="private">Private · invite code only</option><option value="public">Public · listed in room finder</option></select></label>
-      <button class="btn multiplayer-wide" id="createRoomButton" type="button">CREATE ROOM</button>
-      <button class="btn secondary multiplayer-wide" id="resumeWorldButton" type="button">IMPORT JSON BACKUP</button>
-      <button class="btn secondary multiplayer-wide" id="findRoomsButton" type="button">FIND PUBLIC ROOMS</button>
-      <div class="room-divider"><span>or join a friend</span></div>
-      <label class="multiplayer-field" for="roomCodeInput"><span>Invite code</span><input id="roomCodeInput" type="text" maxlength="36" placeholder="Paste the 32-character code" autocomplete="off" spellcheck="false"></label>
-      <button class="btn secondary multiplayer-wide" id="joinRoomButton" type="button">JOIN ROOM</button>
-      <p id="multiplayerStatus" class="multiplayer-status" aria-live="polite">Rooms work while the host stays connected.</p>
-      <div id="createdRoomCode" class="created-room-code" hidden><span>Share this code:</span><strong id="createdRoomCodeText"></strong><button class="btn secondary" id="copyRoomCodeButton" type="button">COPY CODE</button></div>
-      <button class="btn secondary multiplayer-back" id="multiplayerBackButton" type="button">BACK</button>
-    </section>
-    <section class="menu-card room-finder-card" id="roomFinderMenu" hidden>
-      <div class="menu-kicker">Join a community world</div>
-      <h2>PUBLIC ROOMS</h2>
-      <p class="room-finder-note">Only rooms with an online host appear here. Private rooms stay hidden.</p>
-      <div id="publicRoomsList" class="public-rooms-list" aria-live="polite"></div>
-      <p id="roomFinderStatus" class="multiplayer-status" aria-live="polite">Looking for public rooms…</p>
-      <div class="room-finder-actions"><button class="btn secondary" id="refreshRoomsButton" type="button">REFRESH</button><button class="btn secondary" id="roomFinderBackButton" type="button">BACK</button></div>
-    </section>
+      <button class="btn multiplayer-wide" id="mpNameContinue" type="button">CONTINUE</button></section>
+      <section class="mp-stage" id="mpStage3" hidden>
+        <label class="multiplayer-field" for="multiplayerMode"><span>World mode (host chooses)</span><select id="multiplayerMode"><option value="classic">Classic</option><option value="realistic">Realistic</option><option value="creative">Creative</option></select></label>
+        <label class="multiplayer-field" for="roomVisibility"><span>Room visibility</span><select id="roomVisibility"><option value="private">Private · invite code only</option><option value="public">Public · listed in room finder</option></select></label>
+        <button class="btn multiplayer-wide" id="createRoomButton" type="button">CREATE ROOM</button>
+        <button class="btn secondary multiplayer-wide" id="resumeWorldButton" type="button">IMPORT JSON BACKUP</button>
+        <button class="btn secondary multiplayer-wide" id="findRoomsButton" type="button">FIND PUBLIC ROOMS</button>
+        <div class="room-finder-card room-finder-inline" id="roomFinderMenu" hidden>
+          <div class="room-finder-topline"><span class="room-finder-mark">CRAFT ONLINE / MULTIPLAYER</span><span class="room-finder-live"><i></i> PUBLIC SERVER LIST</span></div>
+          <h2>FIND A WORLD</h2>
+          <p class="room-finder-note">Browse community worlds. Live hosts can be joined now; offline worlds are shown for discovery.</p>
+          <div class="room-finder-toolbar"><label class="multiplayer-field room-search-field" for="roomFinderSearch"><span>SEARCH WORLDS</span><input id="roomFinderSearch" type="search" maxlength="50" placeholder="Search by world name or mode…" autocomplete="off"></label><button class="btn secondary room-refresh-top" id="refreshRoomsButton" type="button" aria-label="Refresh public worlds">↻ REFRESH</button></div>
+          <p id="roomFinderStatus" class="room-finder-count" aria-live="polite">Connecting to public directory…</p>
+          <div id="publicRoomsList" class="public-rooms-list" aria-live="polite"></div>
+          <div class="room-finder-actions"><button class="btn secondary" id="roomFinderBackButton" type="button">HIDE PUBLIC ROOMS</button></div>
+        </div>
+        <div class="room-divider"><span>or join a friend</span></div>
+        <label class="multiplayer-field" for="roomCodeInput"><span>Invite code</span><input id="roomCodeInput" type="text" maxlength="36" placeholder="Paste the 32-character code" autocomplete="off" spellcheck="false"></label>
+        <button class="btn secondary multiplayer-wide" id="joinRoomButton" type="button">JOIN ROOM</button>
+        <p id="multiplayerStatus" class="multiplayer-status" aria-live="polite">Rooms work while the host stays connected.</p>
+        <div id="createdRoomCode" class="created-room-code" hidden><span>Share this code:</span><strong id="createdRoomCodeText"></strong><button class="btn secondary" id="copyRoomCodeButton" type="button">COPY CODE</button></div>
+        <button class="btn secondary multiplayer-back" id="mpStageBack" type="button">BACK</button><button class="btn secondary multiplayer-back" id="multiplayerBackButton" type="button">EXIT MULTIPLAYER</button>
+      </section>
     <section class="menu-card settings-card" id="settingsMenu" hidden>
       <div class="menu-kicker">Make the game yours</div>
       <h2>SETTINGS</h2>
@@ -105,6 +112,8 @@
       <label class="setting-row" for="graphicsQuality"><span>Graphics quality</span>
         <select id="graphicsQuality"><option value="0.65">Performance</option><option value="0.85" selected>Balanced</option><option value="1">High</option></select>
       </label>
+      <label class="setting-row" for="texturePackInput"><span>Texture pack (JSON)</span><input id="texturePackInput" type="file" accept=".json,application/json"></label>
+      <p class="settings-note">Import a Craft Online texture-pack JSON. It can replace textures by name (for example grassTop, dirt, stone, planks and cobble).</p>
       <p class="settings-note">Lower settings can help improve performance on slower devices.</p>
       <button class="btn secondary" id="backButton">BACK</button>
     </section>

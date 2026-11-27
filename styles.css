@@ -137,6 +137,8 @@
     .public-room-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:bold; font-size:13px; }
     .public-room-meta { color:#c8cec3; font-size:10px; }
     .public-room-row .btn { min-width:86px; padding:8px 10px; font-size:11px; }
+    .public-room-row.offline { opacity:.72; }
+    .public-room-row .btn:disabled { opacity:.55; cursor:not-allowed; }
     .room-finder-actions { display:flex; gap:10px; margin-top:14px; }
     .room-finder-actions .btn { flex:1; min-width:0; }
     .room-code-pause { margin:0 0 14px; color:#c8cec3; font-size:11px; }
@@ -217,3 +219,66 @@
 #multiplayerHud[hidden] { display:none; }
 /* These controls sit inside the non-interactive HUD but must remain clickable. */
 #multiplayerHud button,.multiplayer-float-panel { pointer-events:auto; }
+
+/* Craft Online multiplayer profile/account UI */
+.mp-account-card,.mp-profile{border:1px solid rgba(160,190,150,.25);background:rgba(12,20,15,.65);border-radius:12px;padding:12px;margin:10px 0;display:grid;gap:9px}
+.mp-account-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mp-profile input[type=file]{max-width:100%;font-size:12px}
+@media(max-width:420px){.mp-account-actions{grid-template-columns:1fr}}
+
+/* Craft Online 2.1 staged multiplayer onboarding */
+.mp-step-indicator{margin:12px 0;padding:9px 12px;border:1px solid #53677d;border-radius:9px;background:#182638;color:#a9d7ff;font-size:12px;font-weight:800;letter-spacing:1.2px;text-align:center}
+.mp-stage{display:grid;gap:12px}.mp-stage[hidden]{display:none!important}
+.default-skins{display:grid;gap:8px;margin:8px 0}.default-skins>span{font-size:13px;color:#d5e2ef;font-weight:700}.default-skin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.skin-choice{min-height:42px;border:1px solid #53677d;border-radius:8px;background:#24364a;color:#fff;font-weight:700;cursor:pointer}.skin-choice:hover{background:#34516d;border-color:#8bc9ff}
+
+/* Craft Online Accounts */
+.craft-account-form { display:grid; gap:8px; padding-top:8px; border-top:1px solid rgba(160,190,150,.25); }
+.craft-account-form[hidden] { display:none!important; }
+.craft-account-form .multiplayer-field { margin:4px 0; }
+.mp-account-actions { grid-template-columns:1fr 1fr; }
+.mp-account-actions #guestAccountButton { grid-column:1 / -1; }
+#accountSignOutButton { margin-top:4px; }
+
+/* Room finder search */
+.room-search-field { margin: 0 0 10px; }
+.room-search-field input { width:100%; box-sizing:border-box; }
+.public-room-row[hidden] { display:none!important; }
+
+/* Craft Online 2.1 · redesigned public room browser */
+.room-finder-card { width:min(720px,calc(100vw - 24px)); padding:clamp(18px,3vw,30px); text-align:left; max-height:calc(100vh - 28px); overflow-y:auto; background:linear-gradient(155deg,rgba(28,42,35,.985),rgba(17,25,23,.99)); border:2px solid #718a70; box-shadow:0 0 0 5px #101a16,0 18px 60px #000c; }
+.room-finder-topline { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding-bottom:12px; border-bottom:1px solid #ffffff24; }
+.room-finder-mark { color:#9ab59a; font-size:10px; letter-spacing:1.5px; font-weight:800; }
+.room-finder-live { display:flex; align-items:center; gap:7px; color:#cbd9c5; font-size:9px; letter-spacing:1px; }
+.room-finder-live i { width:7px; height:7px; border-radius:50%; background:#86d77d; box-shadow:0 0 8px #86d77d; }
+.room-finder-card h2 { margin:18px 0 7px!important; text-align:left!important; color:#f0f4e8!important; font-size:clamp(24px,4vw,32px)!important; letter-spacing:2px; }
+.room-finder-note { margin:0 0 18px; color:#b9c8b8; font-size:11px; line-height:1.6; }
+.room-finder-toolbar { display:flex; align-items:end; gap:10px; padding:12px; background:#101a17; border:1px solid #4e6758; border-radius:8px; }
+.room-search-field { flex:1; min-width:0; margin:0!important; }
+.room-search-field span { color:#a9c4a9; font-size:10px; font-weight:800; letter-spacing:1px; }
+.room-search-field input { width:100%; box-sizing:border-box; padding:12px!important; background:#26372f!important; border:1px solid #617b67!important; border-radius:5px; }
+.room-refresh-top { min-width:110px!important; height:42px; padding:8px 12px!important; border-radius:5px; font-size:10px!important; }
+.room-finder-count { margin:14px 2px 9px; color:#d4dfce; font-size:10px; letter-spacing:.5px; }
+.public-rooms-list { display:grid; gap:8px; max-height:min(48vh,430px); overflow:auto; padding:2px 4px 2px 2px; }
+.public-room-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:12px; padding:13px 14px; background:linear-gradient(110deg,#26382f,#202d27); border:1px solid #4e6656; border-left:4px solid #71856d; border-radius:6px; color:#f1efdf; transition:border-color .15s,transform .15s,background .15s; }
+.public-room-row.online { border-left-color:#83d17c; }
+.public-room-row:hover { transform:translateX(2px); border-color:#9ab58b; background:linear-gradient(110deg,#30483a,#25372e); }
+.public-room-info { min-width:0; display:grid; gap:5px; }
+.public-room-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:800; font-size:13px; color:#f1f4e9; }
+.public-room-meta { color:#aebfae; font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
+.public-room-state { display:inline-flex; align-items:center; justify-content:center; min-width:62px; padding:6px 8px; border-radius:4px; font-size:9px; font-weight:900; letter-spacing:.8px; }
+.public-room-state.is-online { color:#a9efa2; background:#21462b; border:1px solid #477d4b; }
+.public-room-state.is-offline { color:#c4c4b7; background:#393e39; border:1px solid #62685f; }
+.public-room-row .btn { min-width:100px!important; padding:9px 12px!important; border-radius:4px; font-size:10px!important; }
+.public-room-row.offline { opacity:.72; }
+.public-room-row .btn:disabled { opacity:.5; cursor:not-allowed; filter:grayscale(.5); }
+.room-finder-actions { display:flex; gap:10px; margin-top:14px; }
+.room-finder-actions .btn { flex:1; min-width:0; border-radius:5px; font-size:10px; }
+#roomFinderNoMatches { padding:22px 12px; text-align:center; color:#b8c7b8; border:1px dashed #536b58; border-radius:6px; }
+@media(max-width:520px) { .room-finder-toolbar { align-items:stretch; flex-direction:column; } .room-refresh-top { width:100%; } .public-room-row { grid-template-columns:minmax(0,1fr) auto; gap:8px; } .public-room-state { grid-column:2; grid-row:1; } .public-room-row .btn { grid-column:1 / -1; width:100%; } }
+
+/* Public room finder is part of multiplayer step 3, not a separate menu. */
+.room-finder-inline { width:100%; max-width:100%; box-sizing:border-box; margin:4px 0 8px; padding:14px; box-shadow:none; }
+.room-finder-inline[hidden] { display:none!important; }
+.room-finder-inline h2 { font-size:22px!important; }
+.room-finder-inline .room-finder-toolbar { flex-wrap:wrap; }
+.room-finder-inline .room-refresh-top { flex:0 0 auto; }
